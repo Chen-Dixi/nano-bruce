@@ -5,6 +5,9 @@ Facade 模式：Agent 作为统一入口，协调 LLM provider、SkillRegistry�
 """
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Callable
 
@@ -12,6 +15,11 @@ from ..provider.base import BaseLLMProvider
 from .prompt_builder import PromptBuilder
 from .skill_registry import SkillRegistry
 from .tools import get_default_tools
+
+# 仅允许执行 scripts/ 下这些扩展名的脚本，避免任意命令执行
+ALLOWED_SCRIPT_EXTENSIONS = (".py", ".sh", ".bash", ".js", ".mjs")
+SCRIPT_TIMEOUT_SECONDS = 60
+MAX_SCRIPT_ARGS = 32
 
 
 def default_read_file(path: str, base: Path | None) -> str:
@@ -68,6 +76,70 @@ class Agent:
             return []
         return get_default_tools(self._skills_base)
 
+    def _run_skill_script(
+        self,
+        skill_name: str,
+        script_name: str,
+        args: list[str] | None = None,
+    ) -> str:
+        """安全执行 skill 的 scripts/ 目录下脚本：路径与扩展名白名单、超时、无 shell。"""
+        skill_dir = self._registry.get_skill_dir(skill_name)
+        if skill_dir is None:
+            return f"Error: skill not found: {skill_name}. Use list_skills to see available skills."
+        scripts_dir = skill_dir / "scripts"
+        if not scripts_dir.is_dir():
+            return f"Error: skill has no scripts/ directory: {skill_name}"
+
+        # 解析路径，禁止跳出 scripts/
+        try:
+            script_path = (scripts_dir / script_name.strip()).resolve()
+            scripts_dir_resolved = scripts_dir.resolve()
+            script_path.relative_to(scripts_dir_resolved)
+        except (ValueError, OSError):
+            return "Error: script path must be under the skill's scripts/ directory."
+
+        if not script_path.is_file():
+            return f"Error: script not found: {script_path.name}"
+
+        if script_path.suffix not in ALLOWED_SCRIPT_EXTENSIONS:
+            return (
+                f"Error: script extension not allowed. Allowed: {', '.join(ALLOWED_SCRIPT_EXTENSIONS)}"
+            )
+
+        cmd_args = args if isinstance(args, list) else []
+        if len(cmd_args) > MAX_SCRIPT_ARGS:
+            return f"Error: too many arguments (max {MAX_SCRIPT_ARGS})"
+
+        if script_path.suffix == ".py":
+            command = [sys.executable, str(script_path)] + cmd_args
+        elif script_path.suffix in (".sh", ".bash"):
+            command = ["bash", str(script_path)] + cmd_args
+        elif script_path.suffix in (".js", ".mjs"):
+            command = ["node", str(script_path)] + cmd_args
+        else:
+            return f"Error: unsupported extension {script_path.suffix}"
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=str(scripts_dir),
+                timeout=SCRIPT_TIMEOUT_SECONDS,
+                capture_output=True,
+                text=True,
+                env={**os.environ},
+            )
+            out = (result.stdout or "").strip()
+            err = (result.stderr or "").strip()
+            if result.returncode != 0:
+                return f"Exit code {result.returncode}\nstdout:\n{out}\nstderr:\n{err}"
+            return out if out else "(no output)"
+        except subprocess.TimeoutExpired:
+            return f"Error: script timed out after {SCRIPT_TIMEOUT_SECONDS}s"
+        except FileNotFoundError as e:
+            return f"Error: interpreter not found: {e}"
+        except Exception as e:
+            return f"Error running script: {e}"
+
     def _execute_tool(self, name: str, arguments: dict[str, Any]) -> str:
         """执行 tool 调用，将结果返回给 LLM。"""
         if name == "read_file":
@@ -82,6 +154,39 @@ class Agent:
                 else:
                     lines.append(f"- {s}")
             return "\n".join(lines) if lines else "No skills loaded."
+        if name == "load_skill":
+            # 选择 Skill 后在系统中执行：按名称加载 SKILL.md 完整内容，供模型按说明执行
+            skill_name = (arguments.get("skill_name") or "").strip()
+            if not skill_name:
+                return "Error: skill_name is required."
+            skill_dir = self._registry.get_skill_dir(skill_name)
+            if skill_dir is None:
+                return f"Error: skill not found: {skill_name}. Use list_skills to see available skills."
+            skill_md = skill_dir / "SKILL.md"
+            if not skill_md.exists():
+                skill_md = skill_dir / "skill.md"
+            if not skill_md.exists():
+                return f"Error: SKILL.md not found in {skill_dir}."
+            content = skill_md.read_text(encoding="utf-8", errors="replace")
+            skill_dir_str = str(skill_dir)
+            return (
+                f"[Skill: {skill_name}]\n"
+                f"Skill directory: {skill_dir_str}\n"
+                "Use read_file with paths under this directory to load examples (e.g. examples/3p-updates.md).\n\n"
+                "--- SKILL.md content ---\n"
+                f"{content}"
+            )
+        if name == "run_skill_script":
+            skill_name = (arguments.get("skill_name") or "").strip()
+            script_name = (arguments.get("script_name") or "").strip()
+            if not skill_name or not script_name:
+                return "Error: skill_name and script_name are required."
+            args = arguments.get("args")
+            if isinstance(args, list):
+                args = [str(a) for a in args[:MAX_SCRIPT_ARGS]]
+            else:
+                args = []
+            return self._run_skill_script(skill_name, script_name, args)
         return f"Unknown tool: {name}"
 
     def chat(

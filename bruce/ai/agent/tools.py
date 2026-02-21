@@ -52,9 +52,74 @@ def list_skills_tool() -> dict[str, Any]:
     }
 
 
+def load_skill_tool() -> dict[str, Any]:
+    """load_skill 工具定义：按名称加载并返回完整 skill 说明，用于「选择后执行」流程。"""
+    return {
+        "type": "function",
+        "function": {
+            "name": "load_skill",
+            "description": (
+                "Load and execute a skill by name. Call this after you have decided which skill to use. "
+                "Returns the full SKILL.md content (instructions, workflow, examples). Use the returned "
+                "skill_dir path with read_file to load files under that skill (e.g. examples/*.md)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "skill_name": {
+                        "type": "string",
+                        "description": "Skill name in kebab-case (e.g. internal-comms, doc-coauthoring).",
+                    },
+                },
+                "required": ["skill_name"],
+            },
+        },
+    }
+
+
+def run_skill_script_tool() -> dict[str, Any]:
+    """run_skill_script 工具定义：安全执行 skill 内 scripts/ 目录下的可执行脚本。"""
+    return {
+        "type": "function",
+        "function": {
+            "name": "run_skill_script",
+            "description": (
+                "Run an executable script from a skill's scripts/ directory. "
+                "Use when the skill instructs you to run a script (e.g. init_skill.py, package_skill.py). "
+                "Scripts run in the skill's scripts/ folder with a timeout. "
+                "Supported: .py (Python), .sh (Bash), .js (Node)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "skill_name": {
+                        "type": "string",
+                        "description": "Skill name in kebab-case (e.g. skill-creator).",
+                    },
+                    "script_name": {
+                        "type": "string",
+                        "description": (
+                            "Script filename or relative path under scripts/ "
+                            "(e.g. init_skill.py, package_skill.py)."
+                        ),
+                    },
+                    "args": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional list of arguments to pass to the script (e.g. [\"my-skill\", \"--path\", \"skills/public\"]).",
+                    },
+                },
+                "required": ["skill_name", "script_name"],
+            },
+        },
+    }
+
+
 def get_default_tools(skills_base: Path | None = None) -> list[dict[str, Any]]:
-    """返回技能型 agent 的默认 tool 列表：read_file + list_skills。"""
+    """返回技能型 agent 的默认 tool 列表：read_file + list_skills + load_skill + run_skill_script。"""
     return [
         read_file_tool(skills_base),
         list_skills_tool(),
+        load_skill_tool(),
+        run_skill_script_tool(),
     ]
