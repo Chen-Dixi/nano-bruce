@@ -16,7 +16,11 @@
   "license": "MIT",
   "dependencies": {
     "gray-matter": "^4.0.3",
-    "openai": "^4.77.0"
+    "openai": "^4.77.0",
+    "@mariozechner/pi-agent-core": "^0.54.0",
+    "@mariozechner/pi-ai": "^0.54.0",
+    "@mariozechner/pi-coding-agent": "^0.54.0",
+    "@mariozechner/pi-tui": "^0.54.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

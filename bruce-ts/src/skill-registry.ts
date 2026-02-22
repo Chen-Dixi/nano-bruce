@@ -1,12 +1,15 @@
 /**
- * Skill registry: discover and cache skills from a directory (Registry pattern).
- * Mirrors Python SkillRegistry; no dependency on skills_ref (pure TS + gray-matter).
+ * Skill 注册表（Registry 模式）：从指定目录发现并缓存所有 skill
+ *
+ * 不依赖 Python 的 skills_ref，用 gray-matter 解析 SKILL.md 的 YAML frontmatter，
+ * 得到 name、description 等，并生成 <available_skills> XML 供 PromptBuilder 使用。
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 
+/** 从 SKILL.md frontmatter 解析出的技能元数据 */
 export interface SkillProperties {
   name: string;
   description: string;
@@ -17,6 +20,7 @@ export interface SkillProperties {
 export class SkillRegistry {
   readonly skillsDir: string;
   private validateOnLoad: boolean;
+  /** 缓存：skill 名称 -> { 目录路径, 属性 } */
   private skills = new Map<string, { dir: string; props: SkillProperties }>();
 
   constructor(skillsDir: string, validateOnLoad = true) {
@@ -24,6 +28,7 @@ export class SkillRegistry {
     this.validateOnLoad = validateOnLoad;
   }
 
+  /** 扫描 skillsDir 下每个子目录，有 SKILL.md 或 skill.md 则解析并缓存；返回已加载的 skill 名称列表 */
   load(): string[] {
     this.skills.clear();
     if (!fs.existsSync(this.skillsDir) || !fs.statSync(this.skillsDir).isDirectory()) {

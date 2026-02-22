@@ -1,5 +1,7 @@
 /**
- * Build system prompts with <available_skills> block (Builder pattern).
+ * 系统提示构建器（Builder 模式）：组装「基础说明 + <available_skills> XML」
+ *
+ * 输出格式符合 Anthropic Agent Skills 协议，便于模型识别可用 skill 及 location（SKILL.md 路径）。
  */
 
 import type { SkillRegistry } from "./skill-registry.js";
@@ -19,6 +21,7 @@ export class PromptBuilder {
     this.systemBase = systemBase ?? DEFAULT_SYSTEM;
   }
 
+  /** 生成完整 system prompt：systemBase + 可选的 <available_skills> + 可选的 extraBlocks */
   buildSystemPrompt(skillNames?: string[] | null, extraBlocks?: string[] | null): string {
     const parts: string[] = [this.systemBase];
     const skillsXml = this.registry.getAvailableSkillsXml(skillNames);

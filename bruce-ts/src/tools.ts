@@ -1,9 +1,12 @@
 /**
- * Tool definitions for the agent (OpenAI Function Calling format).
+ * Agent 工具定义（OpenAI Function Calling 格式）
+ *
+ * 供 legacy Agent（非 Pi）使用；Pi 版工具在 pi-tools.ts 里以 AgentTool 形式定义。
  */
 
 import type { ChatCompletionTool } from "openai/resources/chat/completions.js";
 
+/** 返回默认四个工具：read_file, list_skills, load_skill, run_skill_script */
 export function getDefaultTools(): ChatCompletionTool[] {
   return [
     readFileTool(),

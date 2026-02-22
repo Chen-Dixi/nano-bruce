@@ -1,5 +1,8 @@
 /**
- * Safely run a script from a skill's scripts/ directory: path + extension allowlist, timeout, no shell.
+ * 安全执行 skill 的 scripts/ 目录下脚本
+ *
+ * 策略：路径必须在 scriptsDir 下、扩展名白名单（.py / .sh / .bash / .js / .mjs）、
+ * 超时 60 秒、用 spawn 无 shell，参数列表传递避免注入。
  */
 
 import { spawn } from "node:child_process";
@@ -17,6 +20,9 @@ export interface RunScriptResult {
   error?: string;
 }
 
+/**
+ * 在 scriptsDir 下执行 scriptName，传入 args；.py 用 python3、.sh 用 bash、.js 用 node
+ */
 export function runSkillScript(
   scriptsDir: string,
   scriptName: string,

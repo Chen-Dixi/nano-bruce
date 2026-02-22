@@ -1,5 +1,8 @@
 /**
- * Agent: orchestrates LLM and skills (Facade). Tool loop runs until no more tool_calls.
+ * 自实现的 Agent（Facade）：不依赖 Pi，直接用 OpenAI 兼容客户端 + 工具循环
+ *
+ * 流程：组 system prompt（含 available_skills）→ 调 LLM → 若有 tool_calls 则执行并追加 tool 结果 → 再调 LLM，直到无 tool_calls，返回最后一条 content。
+ * 用于 moonshot / deepseek 等通过 baseURL 兼容 OpenAI 的场景；kimi-coding / openai 推荐用 Pi 版 createBrucePiAgent。
  */
 
 import fs from "node:fs";
@@ -41,10 +44,12 @@ export class Agent {
       ((p) => defaultReadFile(p, this.skillsBase));
   }
 
+  /** 返回要传给 LLM 的 tool 定义列表（OpenAI Function Calling 格式） */
   private getTools(): ReturnType<typeof getDefaultTools> {
     return this.toolsEnabled ? getDefaultTools() : [];
   }
 
+  /** 同步执行单个 tool（read_file / list_skills / load_skill），返回给 LLM 的字符串 */
   private executeTool(name: string, args: Record<string, unknown>): string {
     if (name === "read_file") {
       return this.readFile(String(args.path ?? ""));
@@ -81,6 +86,7 @@ export class Agent {
     return `Unknown tool: ${name}`;
   }
 
+  /** 异步执行 tool；run_skill_script 需调 runSkillScript，其余走 executeTool */
   private async executeToolAsync(name: string, args: Record<string, unknown>): Promise<string> {
     if (name === "run_skill_script") {
       const skillName = String(args.skill_name ?? "").trim();
@@ -98,6 +104,9 @@ export class Agent {
     return Promise.resolve(this.executeTool(name, args));
   }
 
+  /**
+   * 单轮对话：发一条用户消息，若有 tool 调用则循环执行直到模型不再返回 tool_calls，最后返回助手文本
+   */
   async chat(
     userMessage: string,
     options: {
@@ -129,6 +138,7 @@ export class Agent {
 
     let msg = choice.message;
 
+    // 若模型返回了 tool_calls，把 assistant 消息和每个 tool 结果追加进 messages，再请求一次，直到没有 tool_calls
     while (msg.tool_calls?.length) {
       messages.push({
         role: "assistant",
@@ -171,6 +181,7 @@ export class Agent {
   }
 }
 
+/** 默认读文件：仅允许 base 及其子路径，否则返回错误字符串 */
 function defaultReadFile(filePath: string, base: string): string {
   const p = path.resolve(filePath);
   const baseResolved = path.resolve(base);
