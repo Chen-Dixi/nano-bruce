@@ -1,88 +1,44 @@
 # Bruce Agent (TypeScript)
 
-Client-side skill-enabled LLM agent **built on [Pi](https://github.com/badlogic/pi-mono)** (`pi-agent-core` + `pi-ai`). Same rationale as Pi: **smaller permission surface, local data, user-owned**. Python (`../bruce`) is used for **backend services** (APIs, sandboxing, audit) when you need server-side guarantees.
-
-Inspired by [Pi: The Minimal Agent Within OpenClaw](https://lucumr.pocoo.org/2026/1/31/pi/) and the [Pi monorepo](https://github.com/badlogic/pi-mono). Bruce adds a **skill registry**, **&lt;available_skills&gt; prompt**, and **skill tools** (read_file, list_skills, load_skill, run_skill_script) on top of Pi’s agent loop.
+客户端、带 skills 能力的 LLM Agent，**核心全部自实现**（不依赖 Pi 等外部 agent 框架），便于自行优化与扩展。Python 目录 `../bruce` 用于后端服务；Agent 在 TS 侧运行，权限小、数据在本地。
 
 ## 如何运行（简要）
 
-本仓库是 TypeScript 项目，运行前需要先安装依赖并编译：
+1. **安装依赖**：`npm install`
+2. **编译**：`npm run build`（生成 `dist/`）
+3. **运行**：设置环境变量后执行 `npm start` 或 `node dist/cli.js`
 
-1. **安装依赖**：`npm install`（会拉取 node_modules）
-2. **编译**：`npm run build`（用 TypeScript 编译器生成 `dist/` 下的 JS）
-3. **运行**：`npm start` 或 `node dist/cli.js`，并设置对应环境变量（如 `KIMI_API_KEY`）
+示例：`npm start -- --provider moonshot --message "列出可用的 skills"`。支持 `--skills`、`--provider`、`--message`。
 
-命令行参数示例：`npm start -- --provider kimi-coding --message "列出可用的 skills"`。更多见下方 Run 小节。
+## 依赖与架构
 
-## Why TypeScript for the agent?
+- **gray-matter**：解析 SKILL.md 的 YAML frontmatter
+- **openai**：OpenAI 兼容客户端，通过 `baseURL` 对接 Moonshot、DeepSeek 等
+- Agent 循环、工具调用、Skill 注册与提示构建均为本仓库自实现
 
-- **Client / local-first**: Agent runs in the user’s environment (Node or browser later). Data stays local; the user is responsible.
-- **Minimal surface**: Few dependencies; no MCP/skills download by default — the agent extends itself via tools (read_file, run_skill_script) and the shared `skills/` directory.
-- **Portable**: Same OpenAI-compatible API; point `baseURL` at Moonshot, DeepSeek, or OpenAI.
+## 环境变量与 Run
 
-## Why keep Python?
-
-- **Backend services**: Rate limiting, auth, script execution in a sandbox, audit logs, SLA.
-- **skills_ref CLI**: Validate skills, generate prompts (optional; this package can parse SKILL.md in TS with `gray-matter`).
-
-## Setup
-
-```bash
-cd bruce-ts
-npm install
-npm run build
-```
-
-## Run
-
-The agent is built on **Pi** (`@mariozechner/pi-agent-core` + `@mariozechner/pi-ai`). Use Pi’s providers when possible:
+| provider  | 环境变量           | 说明                    |
+|-----------|--------------------|-------------------------|
+| moonshot  | MOONSHOT_API_KEY   | 月之暗面 / Kimi，baseURL 已内置 |
+| deepseek  | DEEPSEEK_API_KEY   | DeepSeek，baseURL 已内置       |
+| openai    | OPENAI_API_KEY     | 默认 baseURL                 |
 
 ```bash
-# Kimi / Moonshot via Pi (set KIMI_API_KEY; Pi uses this env name)
-npm start -- --provider kimi-coding --message "列出可用的 skills"
-
-# OpenAI via Pi (set OPENAI_API_KEY)
-npm start -- --provider openai --message "What skills are available?"
-```
-
-Legacy providers (direct OpenAI client, no Pi):
-
-```bash
-# Moonshot (MOONSHOT_API_KEY)
 npm start -- --provider moonshot --message "列出可用的 skills"
-
-# DeepSeek (DEEPSEEK_API_KEY)
 npm start -- --provider deepseek --message "..."
-
-# Custom skills dir
+npm start -- --provider openai --message "..."
 npm start -- --skills /path/to/skills --message "..."
 ```
 
-## Usage as library
-
-**Preferred: Pi-based agent** (uses Pi’s agent loop, tool execution, and multi-provider API):
-
-```ts
-import { createBrucePiAgent, runBrucePiPrompt, SkillRegistry } from "@nano-bruce/agent";
-
-const registry = new SkillRegistry("./bruce/skills");
-registry.load();
-
-const agent = createBrucePiAgent(registry, {
-  provider: "kimi-coding",
-  modelId: "kimi-k2",
-});
-const reply = await runBrucePiPrompt(agent, "我想写周报，该用哪个 skill？");
-console.log(reply);
-```
-
-**Legacy: custom Agent + OpenAI client** (for moonshot/deepseek with custom baseURL):
+## 作为库使用
 
 ```ts
 import { Agent, createLLM, PromptBuilder, SkillRegistry } from "@nano-bruce/agent";
 
 const registry = new SkillRegistry("./bruce/skills");
 registry.load();
+
 const client = createLLM({
   apiKey: process.env.MOONSHOT_API_KEY!,
   baseURL: "https://api.moonshot.cn/v1",
@@ -94,10 +50,11 @@ const agent = new Agent({
   promptBuilder: new PromptBuilder(registry),
   toolsEnabled: true,
 });
+
 const reply = await agent.chat("我想写周报，该用哪个 skill？");
 console.log(reply);
 ```
 
-## Tools
+## 工具与目录结构
 
-Same as the Python agent: `read_file`, `list_skills`, `load_skill`, `run_skill_script`. Skills directory structure (scripts/, references/, assets/) is the same; see `../bruce/README.md`.
+与 Python 版一致：`read_file`、`list_skills`、`load_skill`、`run_skill_script`。Skill 目录结构（scripts/, references/, assets/）见 `../bruce/README.md`。
