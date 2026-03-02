@@ -1,5 +1,5 @@
 /**
- * Agent 类：封装状态与循环入口，参考 Pi Agent
+ * EngineAgent：引擎级 Agent，封装状态与循环入口，参考 Pi Agent
  *
  * 持有 systemPrompt、messages、tools，提供 prompt() / continue()，
  * 内部调用 agentLoop / agentLoopContinue，将事件推送给订阅者。
@@ -16,7 +16,7 @@ import type {
 } from "./types.js";
 import type { LLMProvider } from "../ai/types.js";
 
-export interface AgentOptions {
+export interface EngineAgentOptions {
   provider: LLMProvider;
   model: string;
   systemPrompt?: string;
@@ -38,7 +38,7 @@ export interface AgentOptions {
   followUpMode?: "all" | "one-at-a-time";
 }
 
-export interface AgentState {
+export interface EngineAgentState {
   systemPrompt: string;
   messages: AgentMessage[];
   tools: AgentTool[];
@@ -46,7 +46,7 @@ export interface AgentState {
   error?: string;
 }
 
-export class Agent {
+export class EngineAgent {
   private _provider: LLMProvider;
   private _model: string;
   private _systemPrompt: string;
@@ -54,7 +54,7 @@ export class Agent {
   private _tools: AgentTool[];
   private _temperature?: number;
   private _maxTokens?: number;
-  private _transformContext?: AgentOptions["transformContext"];
+  private _transformContext?: EngineAgentOptions["transformContext"];
   private _isStreaming = false;
   private _error?: string;
   private _abortController: AbortController | null = null;
@@ -62,7 +62,7 @@ export class Agent {
   private _followUpQueue: AgentMessage[] = [];
   private _listeners = new Set<(e: AgentEvent) => void>();
 
-  constructor(options: AgentOptions) {
+  constructor(options: EngineAgentOptions) {
     this._provider = options.provider;
     this._model = options.model;
     this._systemPrompt = options.systemPrompt ?? "";
@@ -72,7 +72,7 @@ export class Agent {
     this._transformContext = options.transformContext;
   }
 
-  get state(): AgentState {
+  get state(): EngineAgentState {
     return {
       systemPrompt: this._systemPrompt,
       messages: [...this._messages],
@@ -116,7 +116,7 @@ export class Agent {
    */
   async prompt(userMessage: string): Promise<string> {
     if (this._isStreaming) {
-      throw new Error("Agent is already processing. Wait for completion or use steer/followUp.");
+      throw new Error("EngineAgent is already processing. Wait for completion or use steer/followUp.");
     }
     const msg: UserMessage = {
       role: "user",
@@ -131,7 +131,7 @@ export class Agent {
    */
   async continue(): Promise<string> {
     if (this._isStreaming) {
-      throw new Error("Agent is already processing.");
+      throw new Error("EngineAgent is already processing.");
     }
     if (this._messages.length === 0) throw new Error("No messages to continue from.");
     const last = this._messages[this._messages.length - 1];

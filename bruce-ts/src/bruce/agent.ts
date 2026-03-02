@@ -3,7 +3,7 @@
  */
 
 import type { LLMProvider } from "../ai/types.js";
-import { Agent as EngineAgent } from "../agent/agent.js";
+import { EngineAgent } from "../agent/agent.js";
 import { PromptBuilder } from "./prompt-builder.js";
 import type { SkillRegistry } from "./skill-registry.js";
 import { getBruceAgentTools } from "./bruce-tools.js";

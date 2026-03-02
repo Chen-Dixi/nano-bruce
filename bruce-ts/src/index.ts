@@ -4,5 +4,6 @@
 
 export { Agent, type AgentOptions, getBruceAgentTools, type BruceToolsOptions, PromptBuilder, SkillRegistry, type SkillProperties, getDefaultTools, runSkillScript, type RunScriptResult } from "./bruce/index.js";
 export { createProvider, createOpenAIProvider, createLLM, chatCompletion, type ProviderName, type LLMProvider, type ChatMessage, type ChatResult, type LLMOptions } from "./ai/index.js";
-export { Agent as EngineAgent, agentLoop, agentLoopContinue, createAgentStream } from "./agent/index.js";
+export { EngineAgent, agentLoop, agentLoopContinue, createAgentStream } from "./agent/index.js";
+export type { EngineAgentOptions, EngineAgentState } from "./agent/index.js";
 export type { AgentMessage, AgentTool, AgentEvent } from "./agent/types.js";
