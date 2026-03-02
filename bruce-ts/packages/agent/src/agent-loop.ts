@@ -6,7 +6,7 @@
  * 检查 getFollowUpMessages，有则继续下一轮，否则 agent_end。
  */
 
-import type { ChatMessage, ChatTool } from "../ai/types.js";
+import type { ChatMessage, ChatTool } from "@nano-bruce/ai";
 import type {
   AgentContext,
   AgentEvent,

@@ -6,13 +6,50 @@
  * 示例：npm start -- --provider moonshot --message "列出可用的 skills"
  */
 
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Agent, SkillRegistry, PromptBuilder } from "./bruce/index.js";
-import { createProvider } from "./ai/index.js";
+import { Agent, SkillRegistry, PromptBuilder } from "@nano-bruce/bruce";
+import { createProvider } from "@nano-bruce/ai";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_SKILLS = path.resolve(__dirname, "..", "..", "bruce", "skills");
+
+function findGitRepoRoot(startDir: string): string | null {
+  const resolved = path.resolve(startDir);
+  let dir = resolved;
+  while (true) {
+    const gitDir = path.join(dir, ".git");
+    if (fs.existsSync(gitDir) && fs.statSync(gitDir).isDirectory()) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
+/** 从 startDir 向上到 git 根，收集各层候选的 skills 目录（.nano_bruce/skills 或 .agents/skills），返回第一个存在的 */
+function getDefaultSkillsDir(startDir: string): string {
+  const resolvedStart = path.resolve(startDir);
+  const gitRoot = findGitRepoRoot(resolvedStart);
+  const candidates: string[] = [];
+  let dir = resolvedStart;
+
+  while (true) {
+    candidates.push(path.join(dir, ".nano_bruce", "skills"));
+    candidates.push(path.join(dir, ".agents", "skills"));
+    if (gitRoot && dir === gitRoot) break;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  for (const d of candidates) {
+    if (fs.existsSync(d) && fs.statSync(d).isDirectory()) return d;
+  }
+  return gitRoot ? path.join(gitRoot, "bruce", "skills") : path.resolve(__dirname, "..", "..", "..", "..", "bruce", "skills");
+}
 
 function getEnv(key: string): string {
   const v = process.env[key];
@@ -33,7 +70,7 @@ function getEnvKey(provider: string): string {
 
 async function main() {
   const args = process.argv.slice(2);
-  let skillsDir = DEFAULT_SKILLS;
+  let skillsDir = getDefaultSkillsDir(process.cwd());
   let provider = "moonshot";
   let message = "列出当前可用的 skills，并简要说明各自用途。";
 

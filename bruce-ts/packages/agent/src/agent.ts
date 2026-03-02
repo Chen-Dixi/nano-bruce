@@ -14,7 +14,7 @@ import type {
   AgentTool,
   UserMessage,
 } from "./types.js";
-import type { LLMProvider } from "../ai/types.js";
+import type { LLMProvider } from "@nano-bruce/ai";
 
 export interface EngineAgentOptions {
   provider: LLMProvider;

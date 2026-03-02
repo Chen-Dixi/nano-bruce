@@ -4,7 +4,7 @@
  * 消息在 agent 内以 AgentMessage 流转；仅在调用 LLM 时通过 convertToLlm 转为 ai 层 ChatMessage[]。
  */
 
-import type { ChatMessage, LLMProvider } from "../ai/types.js";
+import type { ChatMessage, LLMProvider } from "@nano-bruce/ai";
 
 /** 用户消息 */
 export interface UserMessage {

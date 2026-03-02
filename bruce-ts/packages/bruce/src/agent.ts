@@ -2,8 +2,8 @@
  * Bruce Agent 门面：组合 agent 引擎 + ai provider + SkillRegistry + PromptBuilder
  */
 
-import type { LLMProvider } from "../ai/types.js";
-import { EngineAgent } from "../agent/agent.js";
+import type { LLMProvider } from "@nano-bruce/ai";
+import { EngineAgent } from "@nano-bruce/agent-core";
 import { PromptBuilder } from "./prompt-builder.js";
 import type { SkillRegistry } from "./skill-registry.js";
 import { getBruceAgentTools } from "./bruce-tools.js";

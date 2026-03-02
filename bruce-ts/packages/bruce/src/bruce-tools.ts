@@ -4,7 +4,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import type { AgentTool } from "../agent/types.js";
+import type { AgentTool } from "@nano-bruce/agent-core";
 import type { SkillRegistry } from "./skill-registry.js";
 import { runSkillScript } from "./run-script.js";
 
