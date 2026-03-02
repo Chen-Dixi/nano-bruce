@@ -1,8 +1,7 @@
 /**
- * OpenAI 兼容的 LLM 客户端（Strategy 模式）
+ * OpenAI 兼容的 LLM 客户端（createLLM + chatCompletion）
  *
- * 通过 baseURL 可对接 Moonshot、DeepSeek 等兼容 OpenAI 的 API；
- * 本模块供 legacy Agent 使用，Pi 路径用 pi-ai 的 getModel + streamSimple。
+ * 通过 baseURL 可对接 Moonshot、DeepSeek 等兼容 OpenAI 的 API。
  */
 
 import OpenAI from "openai";
@@ -16,7 +15,7 @@ export interface LLMOptions {
 
 /** 创建 OpenAI 实例，未传 baseURL 时默认官方 API */
 export function createLLM(options: LLMOptions): OpenAI {
-  const { apiKey, baseURL, model: _ } = options;
+  const { apiKey, baseURL } = options;
   return new OpenAI({
     apiKey,
     baseURL: baseURL ?? "https://api.openai.com/v1",

@@ -1,13 +1,8 @@
 /**
- * @nano-bruce/agent — 自实现的 TypeScript 客户端 Agent，支持 Anthropic-style skills
- *
- * 不依赖 Pi，核心（Agent、SkillRegistry、PromptBuilder、tools、run_skill_script）均为自实现，便于后续优化。
- * Python 目录 bruce/ 用于后端服务；Agent 在 TS 侧运行，权限小、数据在本地。
+ * @nano-bruce/agent — 入口：agent 引擎（agent/）+ 厂商适配（ai/）+ Bruce 技能层（bruce/）
  */
 
-export { Agent, type AgentOptions } from "./agent.js";
-export { createLLM, chatCompletion, type LLMOptions } from "./llm.js";
-export { PromptBuilder } from "./prompt-builder.js";
-export { SkillRegistry, type SkillProperties } from "./skill-registry.js";
-export { getDefaultTools } from "./tools.js";
-export { runSkillScript } from "./run-script.js";
+export { Agent, type AgentOptions, getBruceAgentTools, type BruceToolsOptions, PromptBuilder, SkillRegistry, type SkillProperties, getDefaultTools, runSkillScript, type RunScriptResult } from "./bruce/index.js";
+export { createProvider, createOpenAIProvider, createLLM, chatCompletion, type ProviderName, type LLMProvider, type ChatMessage, type ChatResult, type LLMOptions } from "./ai/index.js";
+export { Agent as EngineAgent, agentLoop, agentLoopContinue, createAgentStream } from "./agent/index.js";
+export type { AgentMessage, AgentTool, AgentEvent } from "./agent/types.js";

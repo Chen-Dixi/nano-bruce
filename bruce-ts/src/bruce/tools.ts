@@ -1,7 +1,7 @@
 /**
  * Agent 工具定义（OpenAI Function Calling 格式）
  *
- * 供 legacy Agent（非 Pi）使用；Pi 版工具在 pi-tools.ts 里以 AgentTool 形式定义。
+ * 供需要 ChatCompletionTool[] 的场景使用；agent 引擎使用 bruce-tools 的 AgentTool[]。
  */
 
 import type { ChatCompletionTool } from "openai/resources/chat/completions.js";

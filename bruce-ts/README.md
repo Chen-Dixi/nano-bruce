@@ -13,8 +13,10 @@
 ## 依赖与架构
 
 - **gray-matter**：解析 SKILL.md 的 YAML frontmatter
-- **openai**：OpenAI 兼容客户端，通过 `baseURL` 对接 Moonshot、DeepSeek 等
-- Agent 循环、工具调用、Skill 注册与提示构建均为本仓库自实现
+- **openai**：OpenAI 兼容 API 调用（在 `src/ai/` 中通过 Provider 适配）
+- **src/agent/**：Agent 引擎核心循环（参考 Pi 设计，自实现）：`agent-loop`、事件流、`Agent` 类
+- **src/ai/**：大模型厂商 Provider 适配（`LLMProvider` 接口 + `createProvider` / `createOpenAIProvider`）
+- **src/agent.ts**：Bruce 门面（组合 engine + provider + SkillRegistry + PromptBuilder）
 
 ## 环境变量与 Run
 
@@ -34,18 +36,17 @@ npm start -- --skills /path/to/skills --message "..."
 ## 作为库使用
 
 ```ts
-import { Agent, createLLM, PromptBuilder, SkillRegistry } from "@nano-bruce/agent";
+import { Agent, createProvider, PromptBuilder, SkillRegistry } from "@nano-bruce/agent";
 
 const registry = new SkillRegistry("./bruce/skills");
 registry.load();
 
-const client = createLLM({
+const { provider, model } = createProvider("moonshot", {
   apiKey: process.env.MOONSHOT_API_KEY!,
-  baseURL: "https://api.moonshot.cn/v1",
 });
 const agent = new Agent({
-  client,
-  model: "kimi-k2-turbo-preview",
+  provider,
+  model,
   skillRegistry: registry,
   promptBuilder: new PromptBuilder(registry),
   toolsEnabled: true,
