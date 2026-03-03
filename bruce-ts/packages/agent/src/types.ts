@@ -112,6 +112,7 @@ export type AgentEvent =
   | { type: "turn_start" }
   | { type: "turn_end"; message: AgentMessage; toolResults: ToolResultMessage[] }
   | { type: "message_start"; message: AgentMessage }
+  | { type: "message_update"; message: AssistantMessage }
   | { type: "message_end"; message: AgentMessage }
   | {
       type: "tool_execution_start";

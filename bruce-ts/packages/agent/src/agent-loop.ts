@@ -9,7 +9,6 @@
 import type { ChatMessage, ChatTool } from "@nano-bruce/ai";
 import type {
   AgentContext,
-  AgentEvent,
   AgentLoopConfig,
   AgentMessage,
   AgentTool,
@@ -84,6 +83,99 @@ async function getAssistantResponse(
     stopReason: "stop",
     timestamp: Date.now(),
   };
+}
+
+/**
+ * 流式获取 assistant 消息：若 provider 支持 chatStream 则边收边推 message_start / message_update / message_end，否则退化为 getAssistantResponse
+ */
+async function streamAssistantResponse(
+  context: AgentContext,
+  config: AgentLoopConfig,
+  stream: ReturnType<typeof createAgentStream>
+): Promise<AssistantMessage> {
+  let messages = context.messages;
+  if (config.transformContext) {
+    messages = await config.transformContext(messages, config.signal);
+  }
+  const convert = config.convertToLlm ?? defaultConvertToLlm;
+  const chatMessages: ChatMessage[] = await convert(messages, config.systemPrompt);
+
+  const chatStream = config.provider.chatStream;
+  if (chatStream) {
+    const iter = await chatStream(chatMessages, {
+      model: config.model,
+      temperature: config.temperature,
+      max_tokens: config.maxTokens,
+      tools: toolsToChatTools(config.tools),
+      signal: config.signal,
+    });
+
+    let content = "";
+    let addedStart = false;
+
+    for await (const event of iter) {
+      switch (event.type) {
+        case "start":
+          stream.push({
+            type: "message_start",
+            message: {
+              role: "assistant",
+              content: null,
+              tool_calls: undefined,
+              stopReason: "stop",
+              timestamp: Date.now(),
+            },
+          });
+          addedStart = true;
+          break;
+        case "text_delta":
+          content += event.delta;
+          if (addedStart) {
+            stream.push({
+              type: "message_update",
+              message: {
+                role: "assistant",
+                content,
+                tool_calls: undefined,
+                stopReason: "stop",
+                timestamp: Date.now(),
+              },
+            });
+          }
+          break;
+        case "done": {
+          const final: AssistantMessage = {
+            role: "assistant",
+            content: (event.message.content ?? content) || null,
+            tool_calls: event.message.tool_calls,
+            stopReason: "stop",
+            timestamp: Date.now(),
+          };
+          if (!addedStart) stream.push({ type: "message_start", message: final });
+          stream.push({ type: "message_end", message: final });
+          return final;
+        }
+        case "error":
+          throw event.error instanceof Error ? event.error : new Error(String(event.error));
+      }
+    }
+
+    const fallback: AssistantMessage = {
+      role: "assistant",
+      content: content || null,
+      tool_calls: undefined,
+      stopReason: "stop",
+      timestamp: Date.now(),
+    };
+    if (!addedStart) stream.push({ type: "message_start", message: fallback });
+    stream.push({ type: "message_end", message: fallback });
+    return fallback;
+  }
+
+  const assistantMessage = await getAssistantResponse(context, config);
+  stream.push({ type: "message_start", message: assistantMessage });
+  stream.push({ type: "message_end", message: assistantMessage });
+  return assistantMessage;
 }
 
 /**
@@ -261,12 +353,9 @@ async function runLoop(
         pendingMessages = [];
       }
 
-      const assistantMessage = await getAssistantResponse(currentContext, config);
+      const assistantMessage = await streamAssistantResponse(currentContext, config, stream);
       currentContext.messages.push(assistantMessage);
       newMessages.push(assistantMessage);
-
-      stream.push({ type: "message_start", message: assistantMessage });
-      stream.push({ type: "message_end", message: assistantMessage });
 
       const toolCalls = assistantMessage.tool_calls ?? [];
       hasMoreToolCalls = toolCalls.length > 0;

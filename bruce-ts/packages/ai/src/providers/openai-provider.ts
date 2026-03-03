@@ -5,7 +5,15 @@
  */
 
 import OpenAI from "openai";
-import type { ChatMessage, ChatResult, ChatTool, ChatOptions, LLMProvider } from "./types.js";
+import type {
+  ChatMessage,
+  ChatResult,
+  ChatTool,
+  ChatOptions,
+  LLMProvider,
+  ChatStreamEvent,
+  ChatAssistantMessage,
+} from "../types.js";
 
 export interface OpenAIProviderConfig {
   apiKey: string;
@@ -68,6 +76,69 @@ export function createOpenAIProvider(config: OpenAIProviderConfig): LLMProvider 
         },
         usage: response.usage as ChatResult["usage"],
       };
+    },
+
+    async *chatStream(messages: ChatMessage[], options: ChatOptions): AsyncIterable<ChatStreamEvent> {
+      const { model, temperature = 0.7, max_tokens, tools, signal } = options;
+      const body: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
+        model,
+        messages: messages.map(toOpenAIMessage),
+        temperature,
+        stream: true,
+      };
+      if (max_tokens != null) body.max_tokens = max_tokens;
+      if (tools?.length) body.tools = tools.map(toOpenAITool);
+
+      const stream = await client.chat.completions.create({
+        ...body,
+        ...(signal && { signal }),
+      });
+
+      yield { type: "start" };
+
+      let content = "";
+      const toolCallsAcc: Array<{ id: string; name: string; arguments: string }> = [];
+
+      try {
+        for await (const chunk of stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+          const delta = chunk.choices?.[0]?.delta;
+          if (!delta) continue;
+
+          if (typeof delta.content === "string" && delta.content.length > 0) {
+            content += delta.content;
+            yield { type: "text_delta", delta: delta.content };
+          }
+
+          if (delta.tool_calls?.length) {
+            for (const tc of delta.tool_calls) {
+              const i = tc.index ?? toolCallsAcc.length;
+              while (toolCallsAcc.length <= i) {
+                toolCallsAcc.push({ id: "", name: "", arguments: "" });
+              }
+              const cur = toolCallsAcc[i];
+              if (tc.id != null) cur.id = tc.id;
+              if (tc.function?.name != null) cur.name = tc.function.name;
+              if (tc.function?.arguments != null) cur.arguments += tc.function.arguments;
+            }
+          }
+        }
+
+        const message: ChatAssistantMessage = {
+          role: "assistant",
+          content: content || null,
+          tool_calls:
+            toolCallsAcc.length > 0
+              ? toolCallsAcc.map((t) => ({
+                  id: t.id,
+                  name: t.name,
+                  arguments: t.arguments || "{}",
+                }))
+              : undefined,
+        };
+        yield { type: "done", message };
+      } catch (err) {
+        yield { type: "error", error: err };
+      }
     },
   };
 }

@@ -6,15 +6,17 @@
  */
 
 import type { LLMProvider } from "./types.js";
-import { createOpenAIProvider } from "./openai-provider.js";
+import { createOpenAIProvider } from "./providers/openai-provider.js";
 export type {
   ChatMessage,
   ChatResult,
+  ChatAssistantMessage,
+  ChatStreamEvent,
   ChatTool,
   ChatOptions,
   LLMProvider,
 } from "./types.js";
-export { createOpenAIProvider } from "./openai-provider.js";
+export { createOpenAIProvider } from "./providers/openai-provider.js";
 export { createLLM, chatCompletion, type LLMOptions } from "./llm.js";
 
 export type ProviderName = "openai" | "moonshot" | "deepseek";
