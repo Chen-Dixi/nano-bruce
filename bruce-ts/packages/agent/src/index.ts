@@ -5,6 +5,7 @@
 export { agentLoop, agentLoopContinue } from "./agent-loop.js";
 export { createAgentStream } from "./event-stream.js";
 export { EngineAgent, type EngineAgentOptions, type EngineAgentState } from "./agent.js";
+export type { UserMessage, AssistantMessage, ToolResultMessage } from "@nano-bruce/ai";
 export type {
   AgentMessage,
   AgentContext,
@@ -12,8 +13,5 @@ export type {
   AgentEvent,
   AgentTool,
   AgentToolResult,
-  UserMessage,
-  AssistantMessage,
-  ToolResultMessage,
   ConvertToLlm,
 } from "./types.js";

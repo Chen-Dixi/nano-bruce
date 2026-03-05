@@ -2,43 +2,28 @@
  * Agent 核心循环（参考 Pi agent-loop）
  *
  * 流程：接收初始 prompts → 进入 turn 循环 → 每轮调用 LLM 得到 assistant 消息 →
- * 若有 tool_calls 则执行工具、将结果追加到 context → 再调 LLM，直到无 tool_calls →
+ * 若有 tool_calls（从 content 中 toolCall 块提取）则执行工具、将结果追加到 context → 再调 LLM，直到无 tool_calls →
  * 检查 getFollowUpMessages，有则继续下一轮，否则 agent_end。
+ *
+ * 消息类型（AssistantMessage、ToolResultMessage 等）统一使用 packages/ai 中的定义。
  */
 
-import type { ChatMessage, ChatTool } from "@nano-bruce/ai";
+import type {
+  ChatMessage,
+  ChatTool,
+  AssistantMessage,
+  ToolResultMessage,
+  ToolCallContent,
+  ChatStreamEvent,
+} from "@nano-bruce/ai";
 import type {
   AgentContext,
   AgentLoopConfig,
   AgentMessage,
   AgentTool,
-  AssistantMessage,
-  ToolResultMessage,
-  UserMessage,
 } from "./types.js";
 import { createAgentStream } from "./event-stream.js";
-
-/** 默认：仅保留 user/assistant/toolResult，并转为 ChatMessage[]（system 由调用方在首条注入） */
-function defaultConvertToLlm(messages: AgentMessage[], systemPrompt: string): ChatMessage[] {
-  const out: ChatMessage[] = [];
-  if (systemPrompt.trim()) out.push({ role: "system", content: systemPrompt });
-  for (const m of messages) {
-    if (m.role === "user") out.push({ role: "user", content: m.content });
-    else if (m.role === "assistant")
-      out.push({
-        role: "assistant",
-        content: m.content ?? null,
-        tool_calls: m.tool_calls,
-      });
-    else if (m.role === "toolResult")
-      out.push({
-        role: "tool",
-        tool_call_id: m.toolCallId,
-        content: m.content,
-      });
-  }
-  return out;
-}
+import type { AgentEventStream } from "./event-stream.js";
 
 /** 将 AgentTool[] 转为 ChatTool[] */
 function toolsToChatTools(tools: AgentTool[] | undefined): ChatTool[] | undefined {
@@ -53,8 +38,13 @@ function toolsToChatTools(tools: AgentTool[] | undefined): ChatTool[] | undefine
   }));
 }
 
+/** 从 AssistantMessage 的 content 中提取所有 toolCall 块 */
+function getToolCallsFromContent(msg: AssistantMessage): ToolCallContent[] {
+  return msg.content.filter((b): b is ToolCallContent => b.type === "toolCall");
+}
+
 /**
- * 从当前 context 调 LLM 获取一条 assistant 消息（非流式，一次返回完整消息）
+ * 从当前 context 调 LLM 获取一条 assistant 消息（非流式）
  */
 async function getAssistantResponse(
   context: AgentContext,
@@ -64,8 +54,8 @@ async function getAssistantResponse(
   if (config.transformContext) {
     messages = await config.transformContext(messages, config.signal);
   }
-  const convert = config.convertToLlm ?? defaultConvertToLlm;
-  const chatMessages: ChatMessage[] = await convert(messages, config.systemPrompt);
+  const convert = config.convertToLlm;
+  const chatMessages: ChatMessage[] = await convert(messages, config.systemPrompt)
 
   const chatResult = await config.provider.chat(chatMessages, {
     model: config.model,
@@ -75,34 +65,26 @@ async function getAssistantResponse(
     signal: config.signal,
   });
 
-  const msg = chatResult.message;
-  return {
-    role: "assistant",
-    content: msg.content ?? null,
-    tool_calls: msg.tool_calls,
-    stopReason: "stop",
-    timestamp: Date.now(),
-  };
+  return chatResult.message;
 }
 
 /**
- * 流式获取 assistant 消息：若 provider 支持 chatStream 则边收边推 message_start / message_update / message_end，否则退化为 getAssistantResponse
+ * 流式获取 assistant 消息：若 provider 支持 streamChat 则边收边推 message_start / message_update / message_end，否则退化为 getAssistantResponse
  */
 async function streamAssistantResponse(
   context: AgentContext,
   config: AgentLoopConfig,
-  stream: ReturnType<typeof createAgentStream>
+  stream: AgentEventStream
 ): Promise<AssistantMessage> {
   let messages = context.messages;
   if (config.transformContext) {
     messages = await config.transformContext(messages, config.signal);
   }
-  const convert = config.convertToLlm ?? defaultConvertToLlm;
-  const chatMessages: ChatMessage[] = await convert(messages, config.systemPrompt);
-
-  const chatStream = config.provider.chatStream;
-  if (chatStream) {
-    const iter = await chatStream(chatMessages, {
+  const convert = config.convertToLlm
+  const chatMessages: ChatMessage[] = await convert(messages, config.systemPrompt) as ChatMessage[];
+  const streamChat = config.provider.streamChat;
+  if (streamChat) {
+    const eventStream = streamChat(chatMessages, {
       model: config.model,
       temperature: config.temperature,
       max_tokens: config.maxTokens,
@@ -110,66 +92,47 @@ async function streamAssistantResponse(
       signal: config.signal,
     });
 
-    let content = "";
-    let addedStart = false;
+    let contextAddpartialMessage = false;
+    let partialMessage: AssistantMessage | null = null;
 
-    for await (const event of iter) {
+    for await (const event of eventStream) {
       switch (event.type) {
         case "start":
-          stream.push({
-            type: "message_start",
-            message: {
-              role: "assistant",
-              content: null,
-              tool_calls: undefined,
-              stopReason: "stop",
-              timestamp: Date.now(),
-            },
-          });
-          addedStart = true;
+          partialMessage = event.partial;
+          context.messages.push(partialMessage);
+          contextAddpartialMessage = true;
+          stream.push({ type: "message_start", message: { ...partialMessage } });
           break;
+        case "text_start":
         case "text_delta":
-          content += event.delta;
-          if (addedStart) {
-            stream.push({
-              type: "message_update",
-              message: {
-                role: "assistant",
-                content,
-                tool_calls: undefined,
-                stopReason: "stop",
-                timestamp: Date.now(),
-              },
-            });
+        case "text_end":
+        case "thinking_start":
+        case "thinking_delta":
+        case "thinking_end":
+        case "toolcall_start":
+        case "toolcall_delta":
+        case "toolcall_end": 
+          if (partialMessage) {
+            partialMessage = event.partial;
+            context.messages[context.messages.length - 1] = partialMessage;
+            stream.push({ type: "message_update", message: { ...partialMessage }, assistantMessageEvent: event });
           }
           break;
-        case "done": {
-          const final: AssistantMessage = {
-            role: "assistant",
-            content: (event.message.content ?? content) || null,
-            tool_calls: event.message.tool_calls,
-            stopReason: "stop",
-            timestamp: Date.now(),
-          };
-          if (!addedStart) stream.push({ type: "message_start", message: final });
-          stream.push({ type: "message_end", message: final });
-          return final;
+        case "done": 
+        case "error": {
+            const finalResult = await eventStream.result();
+            if (contextAddpartialMessage) {
+              context.messages[context.messages.length - 1] = finalResult;
+            } else {
+              context.messages.push(finalResult);
+            }
+            stream.push({ type: "message_end", message: finalResult });
+            return finalResult;
         }
-        case "error":
-          throw event.error instanceof Error ? event.error : new Error(String(event.error));
       }
     }
 
-    const fallback: AssistantMessage = {
-      role: "assistant",
-      content: content || null,
-      tool_calls: undefined,
-      stopReason: "stop",
-      timestamp: Date.now(),
-    };
-    if (!addedStart) stream.push({ type: "message_start", message: fallback });
-    stream.push({ type: "message_end", message: fallback });
-    return fallback;
+    return await eventStream.result();
   }
 
   const assistantMessage = await getAssistantResponse(context, config);
@@ -179,7 +142,7 @@ async function streamAssistantResponse(
 }
 
 /**
- * 执行助手消息中的全部 tool_calls，返回 tool 结果消息列表
+ * 执行助手消息中的全部 tool_calls（从 content 的 toolCall 块提取），返回 tool 结果消息列表
  */
 async function executeToolCalls(
   tools: AgentTool[] | undefined,
@@ -187,7 +150,8 @@ async function executeToolCalls(
   config: AgentLoopConfig,
   stream: ReturnType<typeof createAgentStream>
 ): Promise<{ results: ToolResultMessage[]; steeringMessages: AgentMessage[] | null }> {
-  const toolCalls = assistantMessage.tool_calls ?? [];
+  const toolCalls = getToolCallsFromContent(assistantMessage);
+  
   const results: ToolResultMessage[] = [];
   let steeringMessages: AgentMessage[] | null = null;
 
@@ -199,14 +163,13 @@ async function executeToolCalls(
       type: "tool_execution_start",
       toolCallId: tc.id,
       toolName: tc.name,
-      args: parseJsonSafe(tc.arguments),
+      args: tc.arguments,
     });
 
     let result: { content: string; isError?: boolean };
     try {
       if (!tool) throw new Error(`Tool not found: ${tc.name}`);
-      const args = parseJsonSafe(tc.arguments) as Record<string, unknown>;
-      const out = await tool.execute(tc.id, args, config.signal);
+      const out = await tool.execute(tc.id, tc.arguments, config.signal);
       result = { content: out.content, isError: out.isError };
     } catch (e) {
       result = {
@@ -227,8 +190,8 @@ async function executeToolCalls(
       role: "toolResult",
       toolCallId: tc.id,
       toolName: tc.name,
-      content: result.content,
-      isError: result.isError,
+      content: [{ type: "text", text: result.content }],
+      isError: result.isError ?? false,
       timestamp: Date.now(),
     };
     results.push(toolResultMsg);
@@ -245,7 +208,7 @@ async function executeToolCalls(
             role: "toolResult",
             toolCallId: skip.id,
             toolName: skip.name,
-            content: "Skipped due to queued user message.",
+            content: [{ type: "text", text: "Skipped due to queued user message." }],
             isError: true,
             timestamp: Date.now(),
           };
@@ -259,15 +222,6 @@ async function executeToolCalls(
   }
 
   return { results, steeringMessages };
-}
-
-function parseJsonSafe(s: string): Record<string, unknown> {
-  try {
-    const o = JSON.parse(s);
-    return typeof o === "object" && o !== null ? o : {};
-  } catch {
-    return {};
-  }
 }
 
 /**
@@ -330,7 +284,7 @@ async function runLoop(
   currentContext: AgentContext,
   newMessages: AgentMessage[],
   config: AgentLoopConfig,
-  stream: ReturnType<typeof createAgentStream>
+  stream: AgentEventStream
 ): Promise<void> {
   let firstTurn = true;
   let pendingMessages: AgentMessage[] = (await config.getSteeringMessages?.()) ?? [];
@@ -354,10 +308,10 @@ async function runLoop(
       }
 
       const assistantMessage = await streamAssistantResponse(currentContext, config, stream);
-      currentContext.messages.push(assistantMessage);
       newMessages.push(assistantMessage);
 
-      const toolCalls = assistantMessage.tool_calls ?? [];
+      const toolCalls = getToolCallsFromContent(assistantMessage);
+      console.log("toolCalls", toolCalls);
       hasMoreToolCalls = toolCalls.length > 0;
       let toolResultsThisTurn: ToolResultMessage[] = [];
 

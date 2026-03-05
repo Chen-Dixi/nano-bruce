@@ -7,6 +7,7 @@ import { EngineAgent } from "@nano-bruce/agent-core";
 import { PromptBuilder } from "./prompt-builder.js";
 import type { SkillRegistry } from "./skill-registry.js";
 import { getBruceAgentTools } from "./bruce-tools.js";
+import type { AgentEvent } from "@nano-bruce/agent-core";
 
 export interface AgentOptions {
   provider: LLMProvider;
@@ -49,6 +50,11 @@ export class Agent {
     });
   }
 
+  subscribe(fn: (e: AgentEvent) => void) {
+    this.engine.subscribe(fn);
+  }
+  
+
   /**
    * 单次对话：发一条用户消息，跑完 agent 循环（含工具调用），返回最后一条助手文本
    */
@@ -59,12 +65,12 @@ export class Agent {
       skillNames?: string[] | null;
       temperature?: number;
     }
-  ): Promise<string> {
+  ): Promise<void> {
     const { systemOverride = null, skillNames = null } = options ?? {};
     if (systemOverride != null) this.engine.setSystemPrompt(systemOverride);
     else if (skillNames != null)
       this.engine.setSystemPrompt(this.promptBuilder.buildSystemPrompt(skillNames));
-    return this.engine.prompt(userMessage);
+    await this.engine.prompt(userMessage);
   }
 
   listSkills(): string[] {

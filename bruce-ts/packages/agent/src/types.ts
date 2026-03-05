@@ -4,45 +4,10 @@
  * 消息在 agent 内以 AgentMessage 流转；仅在调用 LLM 时通过 convertToLlm 转为 ai 层 ChatMessage[]。
  */
 
-import type { ChatMessage, LLMProvider } from "@nano-bruce/ai";
-
-/** 用户消息 */
-export interface UserMessage {
-  role: "user";
-  content: string;
-  timestamp?: number;
-}
-
-/** 工具调用（助手消息中的一项） */
-export interface ToolCallPart {
-  type: "toolCall";
-  id: string;
-  name: string;
-  arguments: string;
-}
-
-/** 助手消息 */
-export interface AssistantMessage {
-  role: "assistant";
-  content: string | null;
-  tool_calls?: Array<{ id: string; name: string; arguments: string }>;
-  stopReason?: "stop" | "length" | "tool_calls" | "error" | "aborted";
-  errorMessage?: string;
-  timestamp?: number;
-}
-
-/** 工具结果消息 */
-export interface ToolResultMessage {
-  role: "toolResult";
-  toolCallId: string;
-  toolName: string;
-  content: string;
-  isError?: boolean;
-  timestamp?: number;
-}
+import type { AssistantMessage, ChatMessage, ChatStreamEvent, LLMProvider, Message, ToolResultMessage } from "@nano-bruce/ai";
 
 /** Agent 内统一消息类型 */
-export type AgentMessage = UserMessage | AssistantMessage | ToolResultMessage;
+export type AgentMessage = Message
 
 /** 工具执行结果（供 execute 返回） */
 export interface AgentToolResult {
@@ -91,8 +56,8 @@ export interface AgentLoopConfig {
   maxTokens?: number;
   signal?: AbortSignal;
 
-  /** AgentMessage[] → ChatMessage[]，默认实现只保留 user/assistant/tool 并映射 */
-  convertToLlm?: ConvertToLlm;
+  /** AgentMessage[] → ChatMessage[]，未提供时 agent-loop 使用内置 defaultConvertToLlm */
+  convertToLlm: ConvertToLlm;
 
   /** 可选：在每次 LLM 调用前对 messages 做裁剪/注入 */
   transformContext?: (messages: AgentMessage[], signal?: AbortSignal) => AgentMessage[] | Promise<AgentMessage[]>;
@@ -106,22 +71,25 @@ export interface AgentLoopConfig {
 
 // --- 事件类型（供 UI / 上层订阅）---
 
+/**
+ * Agent 事件：供 for await (event of stream) 消费，用于 UI 渲染、日志、状态同步。
+ */
 export type AgentEvent =
-  | { type: "agent_start" }
-  | { type: "agent_end"; messages: AgentMessage[] }
-  | { type: "turn_start" }
-  | { type: "turn_end"; message: AgentMessage; toolResults: ToolResultMessage[] }
-  | { type: "message_start"; message: AgentMessage }
-  | { type: "message_update"; message: AssistantMessage }
-  | { type: "message_end"; message: AgentMessage }
+  | { type: "agent_start" } // agent_start: 一次 agent 运行开始（含多轮 turn）
+  | { type: "agent_end"; messages: AgentMessage[] } // agent_end: 一次 agent 运行结束，messages 为本轮产生的全部新消息
+  | { type: "turn_start" } // turn_start: 新一轮 turn 开始（即将调 LLM）
+  | { type: "turn_end"; message: AgentMessage; toolResults: ToolResultMessage[] } // turn_end: 本轮 turn 结束，含本轮的 assistant message 与本轮产生的 tool 结果列表
+  | { type: "message_start"; message: AgentMessage } // message_start: 某条消息开始（user/assistant/toolResult），message 为完整或占位
+  | { type: "message_update"; message: AssistantMessage, assistantMessageEvent: ChatStreamEvent } // message_update: 仅流式时出现，assistant 消息的中间状态（如打字机效果），message 为当前累积的 partial
+  | { type: "message_end"; message: AgentMessage } // message_end: 某条消息结束，message 为最终完整内容
   | {
-      type: "tool_execution_start";
+      type: "tool_execution_start"; // tool_execution_start: 开始执行一个 tool call，含 id、name、解析后的 args
       toolCallId: string;
       toolName: string;
       args: Record<string, unknown>;
     }
   | {
-      type: "tool_execution_end";
+      type: "tool_execution_end"; // tool_execution_end: 单个 tool 执行完毕，含 result 与是否错误
       toolCallId: string;
       toolName: string;
       result: AgentToolResult;

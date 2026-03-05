@@ -5,19 +5,18 @@
  * 供 agent 层调用，不关心具体 API 形态。
  */
 
-import type { LLMProvider } from "./types.js";
 import { createOpenAIProvider } from "./providers/openai-provider.js";
-export type {
-  ChatMessage,
-  ChatResult,
-  ChatAssistantMessage,
-  ChatStreamEvent,
-  ChatTool,
-  ChatOptions,
-  LLMProvider,
-} from "./types.js";
+import type { LLMProvider } from "./types.js";
+export { EventStream } from "./event-stream.js";
+export { chatCompletion, createLLM, type LLMOptions } from "./llm.js";
 export { createOpenAIProvider } from "./providers/openai-provider.js";
-export { createLLM, chatCompletion, type LLMOptions } from "./llm.js";
+export type {
+  AssistantMessage, ChatContentBlock, ChatMessage, ChatOptions, ChatResult, ChatStreamEvent, SystemMessage,
+  ChatTool, LLMProvider, Message, StopReason,
+  TextContent,
+  ThinkingContent,
+  ToolCallContent, ToolResultMessage, UserMessage
+} from "./types.js";
 
 export type ProviderName = "openai" | "moonshot" | "deepseek";
 

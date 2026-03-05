@@ -86,7 +86,7 @@ async function main() {
 
   const registry = new SkillRegistry(skillsDir);
   registry.load();
-  console.error("Loaded skills:", registry.listSkills());
+  console.log("Loaded skills:", registry.listSkills());
 
   const apiKey = getEnv(getEnvKey(provider));
   const { provider: llmProvider, model } = createProvider(
@@ -101,8 +101,18 @@ async function main() {
     toolsEnabled: true,
   });
 
-  const response = await agent.chat(message);
-  console.log(response);
+  agent.subscribe((event) => {
+    if (event.type !== "message_update") return;
+    const e = event.assistantMessageEvent;
+    // 只对面向用户的文本做打字机效果，不打印工具调用的 JSON（避免出现 "{}" 或参数片段）
+    if (e.type === "text_delta" || e.type === "thinking_delta") {
+      process.stdout.write(e.delta);
+    } else if (e.type === "text_end" || e.type === "thinking_end") {
+      process.stdout.write("\n");
+    }
+  });
+  await agent.chat(message);
+  // console.log(response);
 }
 
 main().catch((err) => {
