@@ -162,8 +162,11 @@ async function* streamOpenAIChatEvents(
 
       if (delta.tool_calls?.length) {
         for (const tc of delta.tool_calls) {
-          const i = tc.index ?? blocks.length;
-          while (blocks.length <= i) {
+          const toolCallIndex = tc.index ?? 0;
+          const toolCallBlockIndices = blocks
+            .map((b, idx) => (b.type === "toolCall" ? idx : -1))
+            .filter((idx) => idx >= 0);
+          while (toolCallBlockIndices.length <= toolCallIndex) {
             for (const e of finishAndEmitEnd(currentBlock)) yield e;
             currentBlock = {
               type: "toolCall",
@@ -173,9 +176,11 @@ async function* streamOpenAIChatEvents(
               partialArgs: "",
             };
             blocks.push(currentBlock);
+            toolCallBlockIndices.push(blocks.length - 1);
             yield { type: "toolcall_start", contentIndex: blockIndex(), partial: output };
           }
-          const cur = blocks[i] as ToolCallContent & { partialArgs?: string };
+          const blockIdx = toolCallBlockIndices[toolCallIndex];
+          const cur = blocks[blockIdx] as ToolCallContent & { partialArgs?: string };
           if (tc.id != null) cur.id = tc.id;
           if (tc.function?.name != null) cur.name = tc.function.name;
           if (tc.function?.arguments != null) {
@@ -184,7 +189,7 @@ async function* streamOpenAIChatEvents(
           }
           yield {
             type: "toolcall_delta",
-            contentIndex: i,
+            contentIndex: blockIdx,
             delta: tc.function?.arguments ?? "",
             partial: output,
           };

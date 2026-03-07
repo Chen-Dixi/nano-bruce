@@ -280,7 +280,7 @@ async function runLoop(
       newMessages.push(assistantMessage);
 
       const toolCalls = getToolCallsFromContent(assistantMessage);
-      console.log("toolCalls", toolCalls);
+
       hasMoreToolCalls = toolCalls.length > 0;
       let toolResultsThisTurn: ToolResultMessage[] = [];
 
