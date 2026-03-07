@@ -118,11 +118,12 @@ export type ChatStreamEvent =
 
 /** 调用 LLM 的选项 */
 export interface ChatOptions {
-  model: string;
+  model: Model<any>,
   temperature?: number;
   max_tokens?: number;
   tools?: ChatTool[];
   signal?: AbortSignal;
+  apiKey?: string;
 }
 
 export class AssistantMessageEventStream extends EventStream<ChatStreamEvent, AssistantMessage> {
@@ -146,6 +147,7 @@ export class AssistantMessageEventStream extends EventStream<ChatStreamEvent, As
  * 各厂商在 ai/ 下实现此接口（如 openai-provider）。
  * 可选 chatStream：流式返回，供 agent 层做打字机效果与增量推送。
  */
+/** @deprecated Use ApiProvider instead */
 export interface LLMProvider {
   chat(messages: ChatMessage[], options: ChatOptions): Promise<ChatResult>;
   /** 可选：流式 completion，返回 AsyncIterable<ChatStreamEvent> */
@@ -158,4 +160,67 @@ export interface LLMProvider {
     messages: ChatMessage[],
     options: ChatOptions,
   ): AssistantMessageEventStream
+}
+
+export type KnownApi =
+	| "openai-completions"
+	| "openai-responses"
+  | "moonshot-completions"
+  | "deepseek-completions"
+	| "azure-openai-responses"
+	| "openai-codex-responses"
+	| "anthropic-messages"
+	| "bedrock-converse-stream"
+	| "google-generative-ai"
+	| "google-gemini-cli"
+	| "google-vertex";
+
+export type Api = KnownApi | (string & {});
+
+export type KnownProvider =
+	| "amazon-bedrock"
+	| "anthropic"
+	| "google"
+	| "google-gemini-cli"
+	| "google-antigravity"
+	| "google-vertex"
+  | "moonshot"
+  | "deepseek"
+	| "openai"
+	| "azure-openai-responses"
+	| "openai-codex"
+	| "github-copilot"
+	| "xai"
+	| "groq"
+	| "cerebras"
+	| "openrouter"
+	| "vercel-ai-gateway"
+	| "zai"
+	| "mistral"
+	| "minimax"
+	| "minimax-cn"
+	| "huggingface"
+	| "opencode"
+	| "kimi-coding";
+
+/**
+ * represents the service provider/company:
+ */
+export type Provider = KnownProvider | (string & {});
+
+export interface Model<TApi extends Api> {
+  id: string;
+  name: string;
+  api: TApi;
+  provider: Provider;
+  baseURL: string;
+  reasoning: boolean;
+  input: ("text" | "image")[]
+	cost: {
+		input: number; // $/million tokens
+		output: number; // $/million tokens
+		cacheRead: number; // $/million tokens
+		cacheWrite: number; // $/million tokens
+	};
+  contextWindow: number;  
 }

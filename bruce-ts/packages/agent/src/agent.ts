@@ -15,8 +15,8 @@ import type {
   ConvertToLlm,
 } from "./types.js";
 
-import type { Message, UserMessage } from "@nano-bruce/ai";
-import type { ChatMessage, LLMProvider } from "@nano-bruce/ai";
+import type { Message, UserMessage, Model } from "@nano-bruce/ai";
+import type { ChatMessage } from "@nano-bruce/ai";
 
 /** 默认：将 AgentMessage[]（Message）转为 ChatMessage[] 供 Provider 使用 */
 function defaultConvertToLlm(messages: AgentMessage[], systemPrompt: string): ChatMessage[] {
@@ -51,15 +51,14 @@ function defaultConvertToLlm(messages: AgentMessage[], systemPrompt: string): Ch
 
 /** 引擎级 Agent 创建配置 */
 export interface EngineAgentOptions {
-  provider: LLMProvider;
-  model: string;
+  model: Model<any>;
   systemPrompt?: string;
   tools?: AgentTool[];
   temperature?: number;
   maxTokens?: number;
 
-  /** 可选：动态 API key（如过期 token） */
-  getApiKey?: () => Promise<string | undefined> | string | undefined;
+  /** 可选：按 provider 返回 API key */
+  getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
 
   /** 可选：context 转换（裁剪/注入） */
   transformContext?: (
@@ -82,17 +81,19 @@ export interface EngineAgentState {
   error?: string;
 }
 
-export class EngineAgent {
-  /** 大模型 Provider，负责实际 LLM 调用（含 chat / chatStream） */
-  private _provider: LLMProvider;
-  /** 当前使用的模型名（如 gpt-4o-mini） */
-  private _model: string;
+export class EngineAgent {  
+  private _model: Model<any>
   /** 系统提示，每次对话会注入到 context 首条 */
   private _systemPrompt: string;
   /** 对话历史：user / assistant / toolResult 消息列表 */
   private _messages: AgentMessage[] = [];
   /** 当前注册的工具列表，会传给 agent 循环用于 function calling */
   private _tools: AgentTool[];
+  /**
+	 * 动态获取 API key
+	 * 适用于过期 token 的情况（如 GitHub Copilot OAuth）
+	 */
+  public getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
   /** LLM 采样温度，未设则用 provider 默认 */
   private _temperature?: number;
   /** 单次 completion 最大 token 数 */
@@ -115,8 +116,8 @@ export class EngineAgent {
   private _listeners = new Set<(e: AgentEvent) => void>();
 
   constructor(options: EngineAgentOptions) {
-    this._provider = options.provider;
     this._model = options.model;
+    this.getApiKey = options.getApiKey;
     this._systemPrompt = options.systemPrompt ?? "";
     this._tools = options.tools ?? [];
     this._temperature = options.temperature;
@@ -214,15 +215,14 @@ export class EngineAgent {
     };
 
     const config: AgentLoopConfig = {
-      provider: this._provider,
       model: this._model,
-      systemPrompt: this._systemPrompt,
-      tools: this._tools.length ? this._tools : undefined,
+      agentTools: this._tools.length ? this._tools : undefined,
       temperature: this._temperature,
-      maxTokens: this._maxTokens,
+      max_tokens: this._maxTokens,
       signal: this._abortController?.signal,
       transformContext: this._transformContext,
       convertToLlm: this._convertToLlm,
+      getApiKey: this.getApiKey,
     };
 
     const stream = initialPrompts

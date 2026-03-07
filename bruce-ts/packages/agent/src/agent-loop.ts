@@ -8,19 +8,20 @@
  * 消息类型（AssistantMessage、ToolResultMessage 等）统一使用 packages/ai 中的定义。
  */
 
-import type {
-  ChatMessage,
-  ChatTool,
-  AssistantMessage,
-  ToolResultMessage,
-  ToolCallContent,
-  ChatStreamEvent,
+import  {
+  type ChatMessage,
+  type ChatTool,
+  type AssistantMessage,
+  type ToolResultMessage,
+  type ToolCallContent,
+  stream as aiStream,
 } from "@nano-bruce/ai";
 import type {
   AgentContext,
   AgentLoopConfig,
   AgentMessage,
   AgentTool,
+  StreamFn,
 } from "./types.js";
 import { createAgentStream } from "./event-stream.js";
 import type { AgentEventStream } from "./event-stream.js";
@@ -44,101 +45,69 @@ function getToolCallsFromContent(msg: AssistantMessage): ToolCallContent[] {
 }
 
 /**
- * 从当前 context 调 LLM 获取一条 assistant 消息（非流式）
- */
-async function getAssistantResponse(
-  context: AgentContext,
-  config: AgentLoopConfig
-): Promise<AssistantMessage> {
-  let messages = context.messages;
-  if (config.transformContext) {
-    messages = await config.transformContext(messages, config.signal);
-  }
-  const convert = config.convertToLlm;
-  const chatMessages: ChatMessage[] = await convert(messages, config.systemPrompt)
-
-  const chatResult = await config.provider.chat(chatMessages, {
-    model: config.model,
-    temperature: config.temperature,
-    max_tokens: config.maxTokens,
-    tools: toolsToChatTools(config.tools),
-    signal: config.signal,
-  });
-
-  return chatResult.message;
-}
-
-/**
- * 流式获取 assistant 消息：若 provider 支持 streamChat 则边收边推 message_start / message_update / message_end，否则退化为 getAssistantResponse
+ * 流式获取 assistant 消息
  */
 async function streamAssistantResponse(
   context: AgentContext,
   config: AgentLoopConfig,
-  stream: AgentEventStream
+  stream: AgentEventStream,
+  aiStreamFn?: StreamFn, // 调用大模型
 ): Promise<AssistantMessage> {
   let messages = context.messages;
   if (config.transformContext) {
     messages = await config.transformContext(messages, config.signal);
   }
   const convert = config.convertToLlm
-  const chatMessages: ChatMessage[] = await convert(messages, config.systemPrompt) as ChatMessage[];
-  const streamChat = config.provider.streamChat;
-  if (streamChat) {
-    const eventStream = streamChat(chatMessages, {
-      model: config.model,
-      temperature: config.temperature,
-      max_tokens: config.maxTokens,
-      tools: toolsToChatTools(config.tools),
-      signal: config.signal,
-    });
+  const chatMessages: ChatMessage[] = await convert(messages, context.systemPrompt) as ChatMessage[];
+  const streamFunction = aiStreamFn ?? aiStream;
+  const resolvedApiKey = await config.getApiKey?.(config.model.provider);
 
-    let contextAddpartialMessage = false;
-    let partialMessage: AssistantMessage | null = null;
+  const eventStream = await streamFunction(chatMessages, {
+    ...config,
+    tools: toolsToChatTools(config.agentTools),
+    apiKey: resolvedApiKey,
+  });
 
-    for await (const event of eventStream) {
-      switch (event.type) {
-        case "start":
+  let contextAddpartialMessage = false;
+  let partialMessage: AssistantMessage | null = null;
+
+  for await (const event of eventStream) {
+    switch (event.type) {
+      case "start":
+        partialMessage = event.partial;
+        context.messages.push(partialMessage);
+        contextAddpartialMessage = true;
+        stream.push({ type: "message_start", message: { ...partialMessage } });
+        break;
+      case "text_start":
+      case "text_delta":
+      case "text_end":
+      case "thinking_start":
+      case "thinking_delta":
+      case "thinking_end":
+      case "toolcall_start":
+      case "toolcall_delta":
+      case "toolcall_end": 
+        if (partialMessage) {
           partialMessage = event.partial;
-          context.messages.push(partialMessage);
-          contextAddpartialMessage = true;
-          stream.push({ type: "message_start", message: { ...partialMessage } });
-          break;
-        case "text_start":
-        case "text_delta":
-        case "text_end":
-        case "thinking_start":
-        case "thinking_delta":
-        case "thinking_end":
-        case "toolcall_start":
-        case "toolcall_delta":
-        case "toolcall_end": 
-          if (partialMessage) {
-            partialMessage = event.partial;
-            context.messages[context.messages.length - 1] = partialMessage;
-            stream.push({ type: "message_update", message: { ...partialMessage }, assistantMessageEvent: event });
-          }
-          break;
-        case "done": 
-        case "error": {
-            const finalResult = await eventStream.result();
-            if (contextAddpartialMessage) {
-              context.messages[context.messages.length - 1] = finalResult;
-            } else {
-              context.messages.push(finalResult);
-            }
-            stream.push({ type: "message_end", message: finalResult });
-            return finalResult;
+          context.messages[context.messages.length - 1] = partialMessage;
+          stream.push({ type: "message_update", message: { ...partialMessage }, assistantMessageEvent: event });
         }
+        break;
+      case "done": 
+      case "error": {
+          const finalResult = await eventStream.result();
+          if (contextAddpartialMessage) {
+            context.messages[context.messages.length - 1] = finalResult;
+          } else {
+            context.messages.push(finalResult);
+          }
+          stream.push({ type: "message_end", message: finalResult });
+          return finalResult;
       }
     }
-
-    return await eventStream.result();
   }
-
-  const assistantMessage = await getAssistantResponse(context, config);
-  stream.push({ type: "message_start", message: assistantMessage });
-  stream.push({ type: "message_end", message: assistantMessage });
-  return assistantMessage;
+  return await eventStream.result();
 }
 
 /**
@@ -317,7 +286,7 @@ async function runLoop(
 
       if (hasMoreToolCalls) {
         const { results, steeringMessages } = await executeToolCalls(
-          config.tools,
+          config.agentTools,
           assistantMessage,
           config,
           stream

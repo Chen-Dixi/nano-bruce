@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Agent, SkillRegistry, PromptBuilder } from "@nano-bruce/bruce";
-import { createProvider } from "@nano-bruce/ai";
+import { createModel } from "@nano-bruce/ai";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -88,17 +88,15 @@ async function main() {
   registry.load();
   console.log("Loaded skills:", registry.listSkills());
 
+  const providerName = provider === "moonshot" ? "moonshot" : provider === "deepseek" ? "deepseek" : "openai";
+  const model = createModel(providerName);
   const apiKey = getEnv(getEnvKey(provider));
-  const { provider: llmProvider, model } = createProvider(
-    provider === "moonshot" ? "moonshot" : provider === "deepseek" ? "deepseek" : "openai",
-    { apiKey }
-  );
   const agent = new Agent({
-    provider: llmProvider,
     model,
     skillRegistry: registry,
     promptBuilder: new PromptBuilder(registry),
     toolsEnabled: true,
+    getApiKey: () => apiKey,
   });
 
   agent.subscribe((event) => {

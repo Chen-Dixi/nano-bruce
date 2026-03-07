@@ -4,10 +4,24 @@
  * 消息在 agent 内以 AgentMessage 流转；仅在调用 LLM 时通过 convertToLlm 转为 ai 层 ChatMessage[]。
  */
 
-import type { AssistantMessage, ChatMessage, ChatStreamEvent, LLMProvider, Message, ToolResultMessage } from "@nano-bruce/ai";
+import {
+  type AssistantMessage,
+  type ChatMessage,
+  type ChatOptions,
+  type ChatStreamEvent,
+  type Message,
+  type Model,
+  stream,
+  type ToolResultMessage,
+} from "@nano-bruce/ai";
+
 
 /** Agent 内统一消息类型 */
 export type AgentMessage = Message
+
+export type StreamFn = (
+	...args: Parameters<typeof stream>
+) => ReturnType<typeof stream> | Promise<ReturnType<typeof stream>>;
 
 /** 工具执行结果（供 execute 返回） */
 export interface AgentToolResult {
@@ -46,18 +60,16 @@ export type ConvertToLlm = (messages: AgentMessage[], systemPrompt: string) => C
 /**
  * Agent 循环配置：Provider、模型、转换与可选的回调（steering / follow-up）
  */
-export interface AgentLoopConfig {
-  /** 调用 LLM 的 provider */
-  provider: LLMProvider;
-  model: string;
-  systemPrompt: string;
-  tools?: AgentTool[];
-  temperature?: number;
-  maxTokens?: number;
-  signal?: AbortSignal;
-
+export interface AgentLoopConfig extends ChatOptions {
+  agentTools?: AgentTool[];
   /** AgentMessage[] → ChatMessage[]，未提供时 agent-loop 使用内置 defaultConvertToLlm */
   convertToLlm: ConvertToLlm;
+
+  /**
+	 * 动态获取 API key
+	 * 适用于过期 token 的情况（如 GitHub Copilot OAuth）
+	 */
+  getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
 
   /** 可选：在每次 LLM 调用前对 messages 做裁剪/注入 */
   transformContext?: (messages: AgentMessage[], signal?: AbortSignal) => AgentMessage[] | Promise<AgentMessage[]>;

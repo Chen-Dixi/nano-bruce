@@ -6,16 +6,30 @@
  */
 
 import { createOpenAIProvider } from "./providers/openai-provider.js";
-import type { LLMProvider } from "./types.js";
+import type { LLMProvider, Model } from "./types.js";
 export { EventStream } from "./event-stream.js";
 export { chatCompletion, createLLM, type LLMOptions } from "./llm.js";
+export { stream } from "./model-service.js";
 export { createOpenAIProvider } from "./providers/openai-provider.js";
+export * from "./providers/register.js";
 export type {
-  AssistantMessage, ChatContentBlock, ChatMessage, ChatOptions, ChatResult, ChatStreamEvent, SystemMessage,
-  ChatTool, LLMProvider, Message, StopReason,
+  AssistantMessage,
+  ChatContentBlock,
+  ChatMessage,
+  ChatOptions,
+  ChatResult,
+  ChatStreamEvent,
+  ChatTool,
+  LLMProvider,
+  Message,
+  Model,
+  StopReason,
+  SystemMessage,
   TextContent,
   ThinkingContent,
-  ToolCallContent, ToolResultMessage, UserMessage
+  ToolCallContent,
+  ToolResultMessage,
+  UserMessage
 } from "./types.js";
 
 export type ProviderName = "openai" | "moonshot" | "deepseek";
@@ -37,6 +51,34 @@ const DEFAULT_BASE_URLS: Record<ProviderName, string | undefined> = {
   moonshot: "https://api.moonshot.cn/v1",
   deepseek: "https://api.deepseek.com",
 };
+
+const API_BY_PROVIDER: Record<ProviderName, string> = {
+  openai: "openai-completions",
+  moonshot: "moonshot-completions",
+  deepseek: "deepseek-completions",
+};
+
+/**
+ * 根据厂商名和可选 modelId 创建 Model，供 Agent 与 stream 使用
+ */
+export function createModel(
+  provider: ProviderName,
+  modelId?: string
+): Model<any> {
+  const id = modelId ?? DEFAULT_MODELS[provider];
+  const baseURL = DEFAULT_BASE_URLS[provider] ?? "";
+  return {
+    id,
+    name: id,
+    api: API_BY_PROVIDER[provider],
+    provider,
+    baseURL,
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 8192,
+  };
+}
 
 /**
  * 根据厂商名和配置创建 LLMProvider，并返回默认 model/baseURL（用于调用方拼 options）

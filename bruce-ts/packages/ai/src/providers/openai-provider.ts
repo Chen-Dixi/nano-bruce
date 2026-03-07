@@ -3,22 +3,26 @@
  *
  * 通过 baseURL 可对接 OpenAI、Moonshot、DeepSeek 等兼容 OpenAI 的接口。
  * 流式将 SSE 积累到 content 块数组并发出带 partial 的事件，仿 Pi-mono。
+ * 提供 Response API 和 Completion API 的流式实现
  */
 
 import OpenAI from "openai";
+import { getEnvApiKey } from "../env-api-keys.js";
 import type {
-  ChatMessage,
-  ChatResult,
-  ChatTool,
-  ChatOptions,
-  LLMProvider,
-  ChatStreamEvent,
+  Api,
   AssistantMessage,
   ChatContentBlock,
+  ChatMessage,
+  ChatOptions,
+  ChatResult,
+  ChatStreamEvent,
+  ChatTool,
+  LLMProvider,
+  Model,
+  StopReason,
   TextContent,
   ThinkingContent,
   ToolCallContent,
-  StopReason,
 } from "../types.js";
 import { AssistantMessageEventStream } from "../types.js";
 
@@ -48,7 +52,7 @@ async function* streamOpenAIChatEvents(
 ): AsyncIterable<ChatStreamEvent> {
   const { model, temperature = 0.7, max_tokens, tools, signal } = options;
   const body: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
-    model,
+    model: options.model.id,
     messages: messages.map(toOpenAIMessage),
     temperature,
     stream: true,
@@ -198,6 +202,40 @@ async function* streamOpenAIChatEvents(
   }
 }
 
+export const streamOpenAICompletions = (
+  messages: ChatMessage[],
+  options: ChatOptions): AssistantMessageEventStream => {
+  const stream = new AssistantMessageEventStream();
+  const apiKey = options?.apiKey || getEnvApiKey(options.model.provider);
+  if (!apiKey) {
+		throw new Error(`No API key for provider: ${options.model.provider}`);
+	}
+  const client = new OpenAI({
+    apiKey: apiKey,
+    baseURL: options.model.baseURL
+  });
+  (async () => {
+    for await (const event of streamOpenAIChatEvents(client, messages, options)) {
+      stream.push(event);
+    }
+  })();
+  return stream;
+}
+
+/**
+ * 流式获取 OpenAI 响应, Response API 实现
+ * @param model 
+ * @param messages 
+ * @param options 
+ */
+export const streamOpenAPIResponse = (
+  model: Model<Api>,
+  messages: ChatMessage[],
+  options: ChatOptions
+): AssistantMessageEventStream => {
+  throw new Error("Not implemented");
+}
+
 /**
  * 使用 OpenAI SDK 创建 LLMProvider。
  * baseURL 不传时使用官方 https://api.openai.com/v1
@@ -213,7 +251,7 @@ export function createOpenAIProvider(config: OpenAIProviderConfig): LLMProvider 
       const { model, temperature = 0.7, max_tokens, tools, signal } = options;
 
       const body: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
-        model,
+        model: model.id,
         messages: messages.map(toOpenAIMessage),
         temperature,
       };

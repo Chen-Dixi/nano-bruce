@@ -17,7 +17,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test:moonshot": "node test/moonshot-stream.mjs"
   },
   "dependencies": {
     "@nano-bruce/ai": "0.1.1"
