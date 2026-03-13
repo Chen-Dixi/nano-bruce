@@ -13,5 +13,8 @@ export type {
   AgentEvent,
   AgentTool,
   AgentToolResult,
+  AgentToolUpdateCallback,
   ConvertToLlm,
+  Tool,
 } from "./types.js";
+export type { TSchema, Static } from "./types.js";

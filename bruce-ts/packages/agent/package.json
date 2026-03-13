@@ -21,7 +21,8 @@
     "test:moonshot": "node test/moonshot-stream.mjs"
   },
   "dependencies": {
-    "@nano-bruce/ai": "0.1.1"
+    "@nano-bruce/ai": "0.1.1",
+    "@sinclair/typebox": "^0.34.48"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

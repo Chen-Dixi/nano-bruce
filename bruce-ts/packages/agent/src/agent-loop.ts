@@ -21,20 +21,23 @@ import type {
   AgentLoopConfig,
   AgentMessage,
   AgentTool,
+  AgentToolResult,
   StreamFn,
 } from "./types.js";
 import { createAgentStream } from "./event-stream.js";
 import type { AgentEventStream } from "./event-stream.js";
 
-/** 将 AgentTool[] 转为 ChatTool[] */
-function toolsToChatTools(tools: AgentTool[] | undefined): ChatTool[] | undefined {
+/** 将 AgentTool[] 转为 ChatTool[]（传 name/description/parameters schema，泛型由各工具实现方使用） */
+function toolsToChatTools(
+  tools: AgentTool<any, any>[] | undefined
+): ChatTool[] | undefined {
   if (!tools?.length) return undefined;
   return tools.map((t) => ({
     type: "function" as const,
     function: {
       name: t.name,
       description: t.description,
-      parameters: t.parameters,
+      parameters: (t.parameters ?? { type: "object", properties: {} }) as Record<string, unknown>,
     },
   }));
 }
@@ -135,11 +138,15 @@ async function executeToolCalls(
       args: tc.arguments,
     });
 
-    let result: { content: string; isError?: boolean };
+    let result: AgentToolResult<unknown>;
     try {
       if (!tool) throw new Error(`Tool not found: ${tc.name}`);
-      const out = await tool.execute(tc.id, tc.arguments, config.signal);
-      result = { content: out.content, isError: out.isError };
+      const out = await tool.execute(tc.id, tc.arguments as any, config.signal);
+      result = {
+        content: out.content,
+        isError: out.isError,
+        details: out.details,
+      };
     } catch (e) {
       result = {
         content: e instanceof Error ? e.message : String(e),
@@ -160,6 +167,7 @@ async function executeToolCalls(
       toolCallId: tc.id,
       toolName: tc.name,
       content: [{ type: "text", text: result.content }],
+      details: result.details,
       isError: result.isError ?? false,
       timestamp: Date.now(),
     };

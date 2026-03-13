@@ -4,9 +4,23 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { Type } from "@sinclair/typebox";
 import type { AgentTool } from "@nano-bruce/agent-core";
 import type { SkillRegistry } from "./skill-registry.js";
 import { runSkillScript } from "./run-script.js";
+
+const ReadFileSchema = Type.Object({
+  path: Type.String({ description: "Absolute path to the file to read." }),
+});
+const ListSkillsSchema = Type.Object({});
+const LoadSkillSchema = Type.Object({
+  skill_name: Type.String({ description: "Skill name in kebab-case." }),
+});
+const RunSkillScriptSchema = Type.Object({
+  skill_name: Type.String({ description: "Skill name in kebab-case." }),
+  script_name: Type.String({ description: "Script filename under scripts/." }),
+  args: Type.Optional(Type.Array(Type.String(), { description: "Optional arguments." })),
+});
 
 export interface BruceToolsOptions {
   registry: SkillRegistry;
@@ -42,22 +56,20 @@ export function getBruceAgentTools(options: BruceToolsOptions): AgentTool[] {
   return [
     {
       name: "read_file",
+      label: "Read file",
       description:
         "Read the contents of a file. Use this to load full skill instructions from SKILL.md or example files from skill directories.",
-      parameters: {
-        type: "object",
-        properties: { path: { type: "string", description: "Absolute path to the file to read." } },
-        required: ["path"],
-      },
-      async execute(_, args) {
-        const content = readFile(String(args.path ?? ""));
+      parameters: ReadFileSchema,
+      async execute(_, params) {
+        const content = readFile(params.path);
         return { content };
       },
-    },
+    } satisfies AgentTool<typeof ReadFileSchema>,
     {
       name: "list_skills",
+      label: "List skills",
       description: "List all available skill names and their descriptions.",
-      parameters: { type: "object", properties: {} },
+      parameters: ListSkillsSchema,
       async execute() {
         const skills = registry.listSkills();
         const lines = skills.map((s) => {
@@ -66,20 +78,15 @@ export function getBruceAgentTools(options: BruceToolsOptions): AgentTool[] {
         });
         return { content: lines.length ? lines.join("\n") : "No skills loaded." };
       },
-    },
+    } satisfies AgentTool<typeof ListSkillsSchema>,
     {
       name: "load_skill",
+      label: "Load skill",
       description:
         "Load a skill by name. Returns the full SKILL.md content. Use read_file with the skill directory for examples.",
-      parameters: {
-        type: "object",
-        properties: {
-          skill_name: { type: "string", description: "Skill name in kebab-case." },
-        },
-        required: ["skill_name"],
-      },
-      async execute(_, args) {
-        const skillName = String(args.skill_name ?? "").trim();
+      parameters: LoadSkillSchema,
+      async execute(_, params) {
+        const skillName = params.skill_name.trim();
         if (!skillName) return { content: "Error: skill_name is required.", isError: true };
         const skillDir = registry.getSkillDir(skillName);
         if (!skillDir)
@@ -96,29 +103,22 @@ export function getBruceAgentTools(options: BruceToolsOptions): AgentTool[] {
             content,
         };
       },
-    },
+    } satisfies AgentTool<typeof LoadSkillSchema>,
     {
       name: "run_skill_script",
+      label: "Run skill script",
       description: "Run an executable script from a skill's scripts/ directory. Supported: .py, .sh, .js. Scripts run with a timeout.",
-      parameters: {
-        type: "object",
-        properties: {
-          skill_name: { type: "string", description: "Skill name in kebab-case." },
-          script_name: { type: "string", description: "Script filename under scripts/." },
-          args: { type: "array", items: { type: "string" }, description: "Optional arguments." },
-        },
-        required: ["skill_name", "script_name"],
-      },
-      async execute(_, args) {
-        const skillName = String(args.skill_name ?? "").trim();
-        const scriptName = String(args.script_name ?? "").trim();
+      parameters: RunSkillScriptSchema,
+      async execute(_, params) {
+        const skillName = params.skill_name.trim();
+        const scriptName = params.script_name.trim();
         if (!skillName || !scriptName)
           return { content: "Error: skill_name and script_name are required.", isError: true };
         const skillDir = registry.getSkillDir(skillName);
         if (!skillDir)
           return { content: `Error: skill not found: ${skillName}.`, isError: true };
         const scriptsDir = path.join(skillDir, "scripts");
-        const rawArgs = Array.isArray(args.args) ? args.args.slice(0, 32).map(String) : [];
+        const rawArgs = (params.args ?? []).slice(0, 32).map(String);
         const r = await runSkillScript(scriptsDir, scriptName, rawArgs);
         if (r.error) return { content: `Error: ${r.error}`, isError: true };
         if (r.code !== 0)
@@ -128,6 +128,6 @@ export function getBruceAgentTools(options: BruceToolsOptions): AgentTool[] {
           };
         return { content: r.stdout || "(no output)" };
       },
-    },
+    } satisfies AgentTool<typeof RunSkillScriptSchema>,
   ];
 }

@@ -86,7 +86,6 @@ async function main() {
 
   const registry = new SkillRegistry(skillsDir);
   registry.load();
-  console.log("Loaded skills:", registry.listSkills());
 
   const providerName = provider === "moonshot" ? "moonshot" : provider === "deepseek" ? "deepseek" : "openai";
   const model = createModel(providerName);

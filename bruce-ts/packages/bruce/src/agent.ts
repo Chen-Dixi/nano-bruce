@@ -1,5 +1,5 @@
 /**
- * Bruce Agent 门面：组合 agent 引擎 + ai provider + SkillRegistry + PromptBuilder
+ * Bruce Agent 门面：组合 agent 引擎 + ai provider + SkillRegistry + PromptBuilder + 元工具
  */
 
 import type { Model } from "@nano-bruce/ai";
@@ -7,13 +7,21 @@ import { EngineAgent } from "@nano-bruce/agent-core";
 import { PromptBuilder } from "./prompt-builder.js";
 import type { SkillRegistry } from "./skill-registry.js";
 import { getBruceAgentTools } from "./bruce-tools.js";
+import { createCodingTools } from "./core/tools/index.js";
 import type { AgentEvent } from "@nano-bruce/agent-core";
+import type { CodingToolsOptions } from "./core/tools/index.js";
 
 export interface AgentOptions {
   model: Model<any>;
   skillRegistry: SkillRegistry;
   promptBuilder?: PromptBuilder;
   toolsEnabled?: boolean;
+  /** 工作目录，供 read/write/edit/bash 等元工具解析相对路径，默认 process.cwd() */
+  cwd?: string;
+  /** 是否启用 4 个元工具（read、bash、write、edit），默认 true；与 skills 工具同时生效 */
+  codingTools?: boolean;
+  /** 元工具可选配置（Operations 等） */
+  codingToolsOptions?: CodingToolsOptions;
   temperature?: number;
   getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
 }
@@ -32,6 +40,9 @@ export class Agent {
       skillRegistry,
       promptBuilder = new PromptBuilder(skillRegistry),
       toolsEnabled = true,
+      cwd = process.cwd(),
+      codingTools = true,
+      codingToolsOptions,
       temperature = 0.7,
       getApiKey,
     } = options;
@@ -39,7 +50,10 @@ export class Agent {
     this.registry = skillRegistry;
     this.promptBuilder = promptBuilder;
     const systemPrompt = promptBuilder.buildSystemPrompt();
-    const tools = toolsEnabled ? getBruceAgentTools({ registry: skillRegistry }) : [];
+    const skillTools = toolsEnabled ? getBruceAgentTools({ registry: skillRegistry }) : [];
+    const metaTools =
+      toolsEnabled && codingTools ? createCodingTools(cwd, codingToolsOptions) : [];
+    const tools = [...skillTools, ...metaTools];
 
     this.engine = new EngineAgent({
       model,

@@ -4,6 +4,8 @@
  * 消息在 agent 内以 AgentMessage 流转；仅在调用 LLM 时通过 convertToLlm 转为 ai 层 ChatMessage[]。
  */
 
+import type { TSchema } from "@sinclair/typebox";
+import type { Static } from "@sinclair/typebox";
 import {
   type AssistantMessage,
   type ChatMessage,
@@ -15,6 +17,9 @@ import {
   type ToolResultMessage,
 } from "@nano-bruce/ai";
 
+/** 从 TypeBox 复用以保持与 Pi-mono 命名一致，工具参数 schema 的基约束 */
+export type { TSchema } from "@sinclair/typebox";
+export type { Static } from "@sinclair/typebox";
 
 /** Agent 内统一消息类型 */
 export type AgentMessage = Message
@@ -23,25 +28,50 @@ export type StreamFn = (
 	...args: Parameters<typeof stream>
 ) => ReturnType<typeof stream> | Promise<ReturnType<typeof stream>>;
 
-/** 工具执行结果（供 execute 返回） */
-export interface AgentToolResult {
+/**
+ * 工具执行结果（供 execute 返回）。
+ * TDetails：工具可选的详细信息类型（如截断信息、匹配数等），供 UI 类型安全地消费。
+ */
+export interface AgentToolResult<TDetails = any> {
   content: string;
   isError?: boolean;
+  details?: TDetails;
 }
 
 /**
- * Agent 工具定义：名称、描述、参数 schema、执行函数。
- * 调用 LLM 时转为 ai 层 ChatTool；收到 tool_calls 时按 name 查找并执行 execute。
+ * 可选：execute 执行过程中的增量结果回调（流式更新）。
  */
-export interface AgentTool {
+export type AgentToolUpdateCallback<TDetails = any> = (
+  partial: AgentToolResult<TDetails>
+) => void;
+
+/**
+ * 工具基接口：name、description、parameters（TypeBox schema）。
+ * TParameters 为参数 schema，用于 LLM 与运行时校验，Static<TParameters> 为参数 TS 类型。
+ */
+export interface Tool<TParameters extends TSchema = TSchema> {
   name: string;
   description?: string;
-  parameters?: Record<string, unknown>;
+  parameters?: TParameters;
+}
+
+/**
+ * Agent 工具定义（对齐 Pi-mono）：继承 Tool，增加 label 与 execute。
+ * - TParameters extends TSchema：参数 schema，execute 的 params 为 Static<TParameters>，编译时类型安全。
+ * - TDetails：执行结果 details 类型，供 UI/上层类型安全地访问元数据。
+ */
+export interface AgentTool<
+  TParameters extends TSchema = TSchema,
+  TDetails = any
+> extends Tool<TParameters> {
+  /** 供 UI 展示的人类可读标签 */
+  label: string;
   execute(
     toolCallId: string,
-    args: Record<string, unknown>,
-    signal?: AbortSignal
-  ): Promise<AgentToolResult>;
+    params: Static<TParameters>,
+    signal?: AbortSignal,
+    onUpdate?: AgentToolUpdateCallback<TDetails>
+  ): Promise<AgentToolResult<TDetails>>;
 }
 
 /** Agent 上下文：系统提示 + 消息历史 + 工具列表 */
@@ -104,6 +134,6 @@ export type AgentEvent =
       type: "tool_execution_end"; // tool_execution_end: 单个 tool 执行完毕，含 result 与是否错误
       toolCallId: string;
       toolName: string;
-      result: AgentToolResult;
+      result: AgentToolResult<unknown>;
       isError: boolean;
     };
