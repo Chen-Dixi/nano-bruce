@@ -1,0 +1,32 @@
+{
+  "name": "@nano-bruce/bruce",
+  "version": "0.1.1",
+  "description": "Bruce skills: SkillRegistry, PromptBuilder, tools, Agent facade.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@nano-bruce/agent-core": "0.1.1",
+    "@nano-bruce/ai": "0.1.1",
+    "@sinclair/typebox": "^0.34.48",
+    "diff": "^8.0.3",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

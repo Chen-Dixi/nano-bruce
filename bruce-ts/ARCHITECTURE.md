@@ -1,229 +1,215 @@
 # Bruce-ts 架构说明
 
-本文档按**主题**组织，便于快速理解设计并参与维护与迭代。
+本文档按**主题**组织，描述当前 monorepo 结构与各层职责，便于维护与迭代。
 
 ---
 
 ## 1. 概述与设计目标
 
-**Bruce-ts** 是一个自实现的、带「技能（skills）」能力的 LLM Agent 客户端，核心不依赖 Pi 等外部 agent 框架，便于在仓库内直接优化与扩展。
+**Bruce-ts** 是自实现的、带「技能（skills）」能力的 LLM Agent 客户端，核心不依赖 Pi 等外部 agent 框架。
 
 - **运行位置**：在用户环境（Node）中运行，数据在本地，权限面小。
-- **与 Python 的关系**：Python 目录 `../bruce` 负责后端服务（API、沙箱、审计）；本仓库负责客户端 Agent 与技能调用。
-- **技能协议**：兼容 Anthropic 风格的 skills（`<available_skills>` XML、SKILL.md、scripts/ 等），与 Python 侧约定一致。
+- **与 Python 的关系**：同仓库下的 `bruce/`（或约定目录）负责后端与技能定义；本仓库负责 TypeScript 端 Agent 与技能调用。
+- **技能协议**：兼容 Anthropic 风格（`<available_skills>` XML、SKILL.md、scripts/ 等），与 Python 侧约定一致。
 
 ---
 
-## 2. 目录与分层
+## 2. Monorepo 与目录结构
 
 ```
-src/
-├── index.ts          # 包入口，统一再导出
-├── cli.ts            # 命令行入口
-├── agent/            # 【主题一】Agent 引擎：循环、事件、状态
-├── ai/               # 【主题二】大模型厂商适配
-└── bruce/            # 【主题三】Bruce 技能层：注册表、提示、工具、门面
+bruce-ts/
+├── package.json              # 根：workspaces、build/start/clean/version:sync
+├── tsconfig.base.json        # 公共 compilerOptions
+├── tsconfig.json             # 根类型检查：extends base、paths、include packages/*/src
+├── scripts/
+│   ├── build.mjs             # 按依赖顺序构建 ai → agent → bruce → app
+│   └── sync-version.mjs      # 从根 version 同步到各包及 @nano-bruce/* 依赖
+└── packages/
+    ├── ai/                   # @nano-bruce/ai：LLM Provider 适配
+    │   ├── src/
+    │   ├── tsconfig.build.json
+    │   └── package.json
+    ├── agent/                # @nano-bruce/agent-core：引擎（循环、事件流、EngineAgent）
+    │   ├── src/
+    │   ├── tsconfig.build.json
+    │   └── package.json
+    ├── bruce/                # @nano-bruce/bruce：技能层（SkillRegistry、工具、门面 Agent）
+    │   ├── src/
+    │   ├── tsconfig.build.json
+    │   └── package.json
+    └── app/                  # @nano-bruce/agent：入口包（index 再导出 + CLI）
+        ├── src/
+        ├── tsconfig.json     # 供 IDE，extends build
+        ├── tsconfig.build.json
+        └── package.json
 ```
 
-| 层级 | 目录 | 职责 |
-|------|------|------|
-| 入口 | `index.ts`, `cli.ts` | 对外 API 与 CLI，只做组装与转发 |
-| 引擎 | `agent/` | 与厂商无关的 Agent 循环、消息类型、事件流、EngineAgent 类 |
-| 厂商 | `ai/` | 统一 LLM 接口（Provider）、OpenAI 兼容实现、createProvider |
-| 业务 | `bruce/` | Skill 发现、system prompt 构建、四大工具实现、对外 Agent 门面 |
+| 包名 | 职责 |
+|------|------|
+| **@nano-bruce/ai** | 统一 LLM 接口（Provider）、OpenAI 兼容实现、createProvider、createLLM/chatCompletion |
+| **@nano-bruce/agent-core** | 与厂商无关的 Agent 循环、消息类型、事件流、EngineAgent 类 |
+| **@nano-bruce/bruce** | Skill 发现、system 提示构建、四大工具实现、对外 Agent 门面 |
+| **@nano-bruce/agent** | 对外入口：再导出上述包、CLI（bin: bruce-agent） |
 
-依赖方向：`bruce` → `agent`、`bruce` → `ai`；`agent` → `ai`（仅类型与 Provider 接口）。`agent` 不依赖 `bruce`。
+依赖关系：`app` → `bruce`、`ai`；`bruce` → `agent-core`、`ai`；`agent` → `ai`。
 
 ---
 
-## 3. 主题一：Agent 引擎（`src/agent/`）
+## 3. 根脚本与配置
 
-引擎层提供「消息 + 工具 → LLM → 工具执行 → 再 LLM」的通用循环，不关心具体技能或厂商实现。
+- **build**：`node scripts/build.mjs`，按顺序构建 ai、agent、bruce、app。
+- **start**：`node packages/app/dist/cli.js`，跑 CLI。
+- **clean**：`npm run clean --workspaces`，各包执行 `rm -rf dist`。
+- **version:sync**：从根 `package.json` 的 `version` 同步到各包 `version` 及所有 `@nano-bruce/*` 依赖；版本号只改根目录一处。
+- **tsconfig**：根 `tsconfig.json` 含 `paths` 将 `@nano-bruce/ai`、`@nano-bruce/agent-core`、`@nano-bruce/bruce` 指到各包 `src`，`include` 为 `packages/*/src/**/*.ts`，便于根目录 `tsc --noEmit` 与 IDE 跳转到源码。
 
-### 3.1 核心文件
+---
+
+## 4. 主题一：Agent 引擎（packages/agent，@nano-bruce/agent-core）
+
+引擎层实现「消息 + 工具 → LLM → 工具执行 → 再 LLM」的通用循环，不关心具体技能或厂商。
+
+### 4.1 核心文件（packages/agent/src/）
 
 | 文件 | 作用 |
 |------|------|
-| `types.ts` | `AgentMessage`（user/assistant/toolResult）、`AgentContext`、`AgentTool`、`AgentLoopConfig`、`AgentEvent` 等 |
-| `event-stream.ts` | `createAgentStream()`：可 push 事件、可 `for await` 消费的异步迭代流，用于把循环内事件抛给上层 |
-| `agent-loop.ts` | `agentLoop(prompts, context, config)` / `agentLoopContinue(context, config)`：实现 turn 循环与工具执行 |
-| `agent.ts` | **EngineAgent** 类：维护 systemPrompt、messages、tools，提供 `prompt()`、`continue()`、`subscribe()` |
+| `types.ts` | AgentMessage（user/assistant/toolResult）、AgentContext、AgentTool、AgentLoopConfig、AgentEvent |
+| `event-stream.ts` | createAgentStream()：可 push 事件、for await 消费的异步迭代流 |
+| `agent-loop.ts` | agentLoop / agentLoopContinue、runLoop、getAssistantResponse、executeToolCalls |
+| `agent.ts` | EngineAgent 类：systemPrompt、messages、tools，prompt()、continue()、subscribe() |
+| `index.ts` | 导出引擎公共 API |
 
-### 3.2 消息与上下文
+### 4.2 消息与上下文
 
-- **AgentMessage**：引擎内统一消息类型  
-  - `UserMessage`：`role: "user", content: string`  
-  - `AssistantMessage`：`role: "assistant", content, tool_calls?`  
-  - `ToolResultMessage`：`role: "toolResult", toolCallId, toolName, content`
-- **AgentContext**：`{ systemPrompt, messages: AgentMessage[], tools?: AgentTool[] }`，每次调用 LLM 前会据此拼好「发给厂商」的入参。
-- **AgentTool**：`name`、`description`、`parameters`（schema）、`execute(toolCallId, args, signal)`。引擎在循环里按 `tool_calls` 的 `name` 查找并执行，不关心工具的业务含义。
+- **AgentMessage**：UserMessage、AssistantMessage、ToolResultMessage。
+- **AgentContext**：systemPrompt、messages、tools。
+- **AgentTool**：name、description、parameters、execute(toolCallId, args, signal)。引擎按 tool_calls 的 name 查找并执行。
 
-### 3.3 循环逻辑（agent-loop）
+### 4.3 循环与事件
 
-1. **agentLoop(prompts, context, config)**：把 `prompts` 追加进 context，启动循环。
-2. **runLoop** 内层：
-   - 若有 pending 消息（steering/follow-up），先注入并 emit 事件。
-   - 调用 `getAssistantResponse(context, config)`：用 `convertToLlm` 把 `AgentMessage[]` 转成 `ChatMessage[]`，再 `config.provider.chat(...)` 拿一条 assistant 消息。
-   - 若有 `tool_calls`，则 `executeToolCalls`：按 name 找工具、执行、把结果压成 `ToolResultMessage` 追加进 context，并 push 各类事件；支持中途 `getSteeringMessages` 打断剩余工具。
-   - 发出 `turn_end`，再根据 `getSteeringMessages` 决定下一轮是否有 pending。
-3. **runLoop** 外层：当本轮的 tool 都处理完后，调用 `getFollowUpMessages`；若有则当作下一轮 pending 继续，否则 `agent_end` 并 `stream.end(messages)`。
+- **runLoop**：若有 pending（steering/follow-up）先注入；getAssistantResponse 调 provider.chat；有 tool_calls 则 executeToolCalls，结果追加到 context，再请求 LLM，直到无 tool_calls；最后根据 getFollowUpMessages 决定是否继续一轮。
+- **事件流**：stream.push(agent_start、turn_start、message_start/end、tool_execution_*、turn_end、agent_end)；EngineAgent 消费流并更新 messages、通知 subscribe 监听器。
 
-Steering / follow-up 为可选；CLI 单轮对话一般不配，引擎仍可正常运行。
+### 4.4 扩展要点
 
-### 3.4 事件流（event-stream）
-
-- `createAgentStream()` 返回带 `push(event)`、`end(messages)` 和 `[Symbol.asyncIterator]` 的对象。
-- 循环中通过 `stream.push(AgentEvent)` 发出：`agent_start`、`turn_start`、`message_start`/`message_end`、`tool_execution_start`/`tool_execution_end`、`turn_end`、`agent_end`。
-- 消费方 `for await (const event of stream)`，在 `agent_end` 时迭代结束，并可拿到最终 `messages`。
-- EngineAgent 在 `prompt()`/`continue()` 里消费该流，更新自身 `messages` 并转发给 `subscribe` 的监听器。
-
-### 3.5 扩展与维护要点
-
-- **改循环行为**：改 `agent-loop.ts` 的 `runLoop`、`getAssistantResponse`、`executeToolCalls`。
-- **改消息/事件形态**：改 `types.ts` 中 `AgentMessage`、`AgentEvent`，再在 agent-loop 和 event-stream 的 push 处对齐。
-- **增加引擎级能力**：在 `AgentLoopConfig` 加可选回调或参数，在 `agent-loop` 和 `EngineAgent`（agent/agent.ts）中接入。
+- 改循环：`agent-loop.ts` 的 runLoop、getAssistantResponse、executeToolCalls。
+- 改消息/事件：`types.ts` 及 agent-loop 中 push 处。
 
 ---
 
-## 4. 主题二：AI 层 / 厂商适配（`src/ai/`）
+## 5. 主题二：AI 层（packages/ai，@nano-bruce/ai）
 
-AI 层定义「一次 LLM 调用」的接口，并由具体厂商实现，与 agent 循环解耦。
+定义「一次 LLM 调用」的接口，由具体厂商实现。
 
-### 4.1 核心类型（types.ts）
+### 5.1 核心类型与实现（packages/ai/src/）
 
-- **ChatMessage**：发给 LLM 的消息，兼容 OpenAI 的 system/user/assistant/tool。
-- **ChatTool**：OpenAI Function Calling 风格的工具定义（name、description、parameters）。
-- **ChatResult**：一次 completion 的返回：`{ message: { role, content, tool_calls? }, usage? }`。
-- **ChatOptions**：`model`、`temperature`、`max_tokens`、`tools`、`signal`。
-- **LLMProvider**：接口 `chat(messages: ChatMessage[], options: ChatOptions): Promise<ChatResult>`。
+- **types.ts**：ChatMessage、ChatTool、ChatResult、ChatOptions、**LLMProvider**（chat(messages, options) => Promise<ChatResult>）。
+- **openai-provider.ts**：createOpenAIProvider → LLMProvider，OpenAI SDK + baseURL，非流式。
+- **llm.ts**：createLLM、chatCompletion，传统直接调用用法。
+- **index.ts**：createProvider(name, config)，name 为 openai | moonshot | deepseek，返回 { provider, model, baseURL }。
 
-### 4.2 实现与工厂
+### 5.2 扩展要点
 
-| 文件 | 作用 |
+- 新厂商：新 Provider 实现 + createProvider 分支。
+- 流式：扩展 LLMProvider 返回流，在 agent-loop 的 getAssistantResponse 中消费并汇总成 AssistantMessage。
+
+---
+
+## 6. 主题三：Bruce 技能层（packages/bruce，@nano-bruce/bruce）
+
+技能发现、system 提示、四大工具、对外 Agent 门面。
+
+### 6.1 技能发现与提示（packages/bruce/src/）
+
+- **skill-registry.ts**：SkillRegistry，扫描 skillsDir 子目录、SKILL.md/skill.md，gray-matter 解析 frontmatter，getAvailableSkillsXml(skillNames?)。
+- **prompt-builder.ts**：PromptBuilder，buildSystemPrompt(skillNames?, extraBlocks?)：固定说明 + registry XML + extra。
+
+### 6.2 工具与执行
+
+- **tools.ts**：getDefaultTools() → OpenAI ChatCompletionTool[]（read_file、list_skills、load_skill、run_skill_script）。
+- **bruce-tools.ts**：getBruceAgentTools(options) → AgentTool[]，带 execute：read_file、list_skills、load_skill、run_skill_script。
+- **run-script.ts**：runSkillScript(scriptsDir, scriptName, args)，安全执行（白名单扩展名、超时、无 shell）。
+
+### 6.3 门面 Agent（bruce/src/agent.ts）
+
+- 接受 provider、model、skillRegistry、promptBuilder、toolsEnabled、temperature。
+- 构造时用 promptBuilder.buildSystemPrompt()、getBruceAgentTools({ registry })，new EngineAgent(provider, model, systemPrompt, tools)。
+- chat(userMessage, options?)：可 systemOverride 或 skillNames，再调用 engine.prompt(userMessage)；listSkills() 转发 registry.listSkills()。
+
+### 6.4 扩展要点
+
+- 新工具：bruce-tools.ts 增加 AgentTool，可选同步 tools.ts。
+- 技能协议/目录：skill-registry.ts、prompt-builder.ts；脚本策略：run-script.ts。
+
+---
+
+## 7. 主题四：入口与 CLI（packages/app，@nano-bruce/agent）
+
+### 7.1 index（packages/app/src/index.ts）
+
+从 @nano-bruce/bruce、@nano-bruce/ai、@nano-bruce/agent-core 再导出，对外统一入口。
+
+### 7.2 CLI 与默认 skills 目录（packages/app/src/cli.ts）
+
+- 参数：--skills、--provider、--message；未传 --skills 时使用 **getDefaultSkillsDir(process.cwd())**。
+- **getDefaultSkillsDir(startDir)**：从 startDir 向上找 git 根，沿途收集候选目录：每层的 `.nano_bruce/skills`、`.agents/skills`，返回**第一个已存在的目录**；若都不存在则用 `{gitRoot}/bruce/skills`，无 git 根则退回基于 __dirname 的 fallback。
+- **findGitRepoRoot(startDir)**：向上查找含 `.git` 的目录作为仓库根。
+
+---
+
+## 8. 请求链路与数据流（简要）
+
+1. 用户调用 **bruce.Agent#chat** → 门面调用 **EngineAgent#prompt**。
+2. EngineAgent 将 UserMessage 传入 **agentLoop**，得到 event stream，消费 stream 更新 messages，取最后一条 assistant content 返回。
+3. **runLoop** 内：convertToLlm 将 AgentMessage[] 转为 ChatMessage[]，**config.provider.chat**（ai 层）发请求；若有 tool_calls，**executeToolCalls** 按 name 执行 AgentTool（bruce-tools），结果追加到 context，再请求 LLM，直至无 tool_calls。
+4. 数据形态：引擎内 AgentMessage[]；给 AI 的为 ChatMessage[]；工具定义为 ChatTool[]（由 AgentTool[] 转换）。
+
+---
+
+## 9. 扩展与维护速查
+
+| 目标 | 位置 |
 |------|------|
-| `openai-provider.ts` | 实现 `LLMProvider`：用 OpenAI SDK + 可配置 `baseURL`，一次非流式 `chat.completions.create`，把返回转成 `ChatResult`。 |
-| `llm.ts` | 传统用法：`createLLM(options)` 得到 OpenAI 实例，`chatCompletion(client, messages, options)` 发一次请求；可被其他不经过 Agent 的代码使用。 |
-| `index.ts` | 导出类型与 `createOpenAIProvider`、`createLLM`、`chatCompletion`；并实现 **createProvider(name, config)**。 |
-
-### 4.3 createProvider
-
-- **createProvider(name, config)**：`name` 为 `"openai"` | `"moonshot"` | `"deepseek"`，`config` 含 `apiKey`、可选 `baseURL`、`model`。
-- 内部按 name 选默认 `baseURL` 和 `model`，用 `createOpenAIProvider` 生成同一套接口的实例，返回 `{ provider, model, baseURL }`。
-- CLI 与 Bruce 门面都用它拿到「厂商无关」的 `provider` 和 `model`，再交给引擎。
-
-### 4.4 扩展与维护要点
-
-- **新增厂商**：在 `ai/` 下新增实现 `LLMProvider` 的模块（例如 `anthropic-provider.ts`），在 `createProvider` 中增加分支；若协议差异大，可扩展 `ChatMessage`/`ChatResult` 的形态并在该厂商实现内做转换。
-- **流式**：当前为单次非流式；若要做流式，可扩展 `LLMProvider`（例如返回 AsyncIterable 或 Stream），并在 `agent-loop` 的 `getAssistantResponse` 中消费流并仍汇总成一条 `AssistantMessage` 再往下走。
+| 改 Agent 循环 | packages/agent/src/agent-loop.ts |
+| 改消息/事件类型 | packages/agent/src/types.ts、agent-loop push 处 |
+| 增/换 LLM 厂商 | packages/ai：新 Provider + createProvider |
+| 改 system/技能 XML | packages/bruce/src/prompt-builder.ts、skill-registry.ts |
+| 增/改工具 | packages/bruce/src/bruce-tools.ts（及 tools.ts） |
+| 改脚本执行策略 | packages/bruce/src/run-script.ts |
+| 对外 API / 导出 | packages/app/src/index.ts |
+| CLI 行为 / 默认 skills | packages/app/src/cli.ts |
+| 版本号 | 根 package.json version + npm run version:sync |
 
 ---
 
-## 5. 主题三：Bruce 技能层（`src/bruce/`）
-
-在引擎与 AI 层之上，实现「技能目录发现、system 提示、四大工具、对外 Agent 门面」。
-
-### 5.1 技能发现与提示
-
-| 文件 | 作用 |
-|------|------|
-| `skill-registry.ts` | **SkillRegistry**：扫描 `skillsDir` 下子目录，找 SKILL.md/skill.md，用 gray-matter 解析 frontmatter（name、description 等），缓存目录与属性；提供 `getAvailableSkillsXml(skillNames?)` 生成 `<available_skills>` XML。 |
-| `prompt-builder.ts` | **PromptBuilder**：持有一个 SkillRegistry，`buildSystemPrompt(skillNames?, extraBlocks?)` 返回「固定说明 + registry 的 XML + 可选 extra」拼接成的 system 字符串。 |
-
-技能目录结构、XML 形状与 Python 侧约定一致，便于共用同一套 skills 目录。
-
-### 5.2 工具定义与执行
-
-| 文件 | 作用 |
-|------|------|
-| `tools.ts` | **getDefaultTools()**：返回 OpenAI 风格的 `ChatCompletionTool[]`（read_file、list_skills、load_skill、run_skill_script），供需要「仅声明工具形制」的场景使用。 |
-| `bruce-tools.ts` | **getBruceAgentTools(options)**：返回引擎所需的 **AgentTool[]**，每个工具带 `execute`：read_file（受限路径读文件）、list_skills（从 registry 列技能）、load_skill（读 SKILL.md 并拼成返回）、run_skill_script（调 runSkillScript）。 |
-| `run-script.ts` | **runSkillScript(scriptsDir, scriptName, args)**：在 `scriptsDir` 下安全执行脚本（扩展名白名单、超时、无 shell、参数列表），返回 stdout/stderr/code。 |
-
-门面在构造时用 `getBruceAgentTools({ registry })` 得到 AgentTool 数组，交给引擎；引擎在循环中只按 name 调用 `execute`，不感知「技能」概念。
-
-### 5.3 门面 Agent（bruce/agent.ts）
-
-- **Agent**：对外类，接受 `provider`、`model`、`skillRegistry`、可选 `promptBuilder`、`toolsEnabled`、`temperature`。
-- 构造时：用 `promptBuilder.buildSystemPrompt()` 得到 system，用 `getBruceAgentTools({ registry })` 得到 tools，**new EngineAgent**（agent/agent.ts），把 provider、model、systemPrompt、tools 传入。
-- **chat(userMessage, options?)**：可传 `systemOverride` 或 `skillNames` 以临时改 system；然后调用引擎的 `prompt(userMessage)`，返回最后一条助手文本。
-- **listSkills()**：直接转发 registry 的 `listSkills()`。
-
-因此「技能」与「提示」只在 bruce 层组装；引擎层只看到「一串 message + 一组 AgentTool」。
-
-### 5.4 扩展与维护要点
-
-- **新工具**：在 `bruce-tools.ts` 增加一项 AgentTool（name、description、parameters、execute），并在 `tools.ts` 的 getDefaultTools 中增加对应 OpenAI 工具声明（若需保持一致）。
-- **技能目录/协议变更**：改 `skill-registry.ts`（扫描规则、XML 结构）和 `prompt-builder.ts`（拼接逻辑）；若 SKILL.md 格式变化，同步改 load_skill 的 execute 实现。
-- **脚本执行策略**：改 `run-script.ts`（白名单、超时、环境等）。
-
----
-
-## 6. 主题四：请求链路与数据流
-
-一次 `agent.chat("用户问题")` 的典型路径：
-
-1. **bruce/agent.ts**  
-   - 若未在 options 里改 system，则已用 `promptBuilder.buildSystemPrompt()` 在构造时设好。  
-   - 调用引擎的 `prompt(userMessage)`。
-
-2. **agent/agent.ts（EngineAgent）**
-   - 把用户内容包成 `UserMessage`，调用 `agentLoop([userMsg], context, config)`，得到 event stream；
-   - `for await` 消费 stream，在 `message_end` 时把消息追加到自己的 `messages`，最后取最后一条 assistant 的 content 返回。
-
-3. **agent/agent-loop.ts**  
-   - **runLoop**：把 user 消息放入 context，进入内层 while。  
-   - **getAssistantResponse**：用 `convertToLlm` 把 context.messages 转成 `ChatMessage[]`（含 system），调用 `config.provider.chat(chatMessages, { model, temperature, tools })`。  
-   - **ai/openai-provider**：把 ChatMessage[] 和 ChatTool[] 转成 OpenAI 请求体，发一次 completion，把返回转成 `ChatResult`。  
-   - 若 assistant 带 `tool_calls`，**executeToolCalls**：对每个 call 在 config.tools 里按 name 找到 **AgentTool**（即 bruce-tools 提供的实现），执行 `execute(id, args, signal)`，把返回的 content 封装成 ToolResultMessage 推回 context，并 push 事件。  
-   - 再次 **getAssistantResponse**（此时 context 里多了 assistant + 多条 toolResult），直到本轮没有 tool_calls。  
-   - 若无 follow-up，则 `agent_end`，stream.end(messages)。
-
-4. **数据形态**  
-   - 引擎内：**AgentMessage[]**（user / assistant / toolResult）。  
-   - 跨边界给 AI：**ChatMessage[]**（system / user / assistant / tool），由 `convertToLlm` 生成。  
-   - 工具定义给 AI：**ChatTool[]**，由 `toolsToChatTools(AgentTool[])` 生成。
-
----
-
-## 7. 主题五：扩展与维护入口速查
-
-| 目标 | 主要修改位置 |
-|------|----------------|
-| 改 Agent 循环（如最大 turn、截断策略） | `agent/agent-loop.ts`（runLoop、getAssistantResponse） |
-| 改消息/事件类型或增加事件 | `agent/types.ts`，以及 agent-loop 中 push 处、event-stream 的迭代结束条件 |
-| 增加/更换 LLM 厂商 | `ai/`：新 Provider 实现 + `createProvider` 分支 |
-| 改 system 提示格式或技能 XML | `bruce/prompt-builder.ts`、`bruce/skill-registry.ts` |
-| 增加或修改 Agent 工具 | `bruce/bruce-tools.ts`（及可选 `bruce/tools.ts`） |
-| 改脚本执行策略 | `bruce/run-script.ts` |
-| 对外 API 或包导出 | `src/index.ts`；CLI 行为 `src/cli.ts` |
-
----
-
-## 8. 附录：文件索引
+## 10. 文件索引（packages/*/src）
 
 ```
-src/
-├── index.ts                 # 包入口
-├── cli.ts                   # CLI：参数解析 → createProvider + bruce.Agent → chat
-├── agent/
-│   ├── types.ts             # AgentMessage, AgentContext, AgentTool, AgentLoopConfig, AgentEvent
-│   ├── event-stream.ts      # createAgentStream
-│   ├── agent-loop.ts        # agentLoop, agentLoopContinue, runLoop, getAssistantResponse, executeToolCalls
-│   ├── agent.ts             # EngineAgent 类（prompt/continue/subscribe/state）
-│   └── index.ts             # 导出 agent 引擎公共 API
-├── ai/
-│   ├── types.ts             # ChatMessage, ChatResult, ChatTool, ChatOptions, LLMProvider
-│   ├── openai-provider.ts    # createOpenAIProvider → LLMProvider 实现
-│   ├── llm.ts               # createLLM, chatCompletion（传统 OpenAI 用法）
-│   └── index.ts             # createProvider, 导出类型与实现
-└── bruce/
-    ├── skill-registry.ts    # SkillRegistry, SkillProperties
-    ├── prompt-builder.ts    # PromptBuilder
-    ├── run-script.ts        # runSkillScript, RunScriptResult
-    ├── tools.ts             # getDefaultTools（OpenAI ChatCompletionTool[]）
-    ├── bruce-tools.ts       # getBruceAgentTools（AgentTool[]）
-    ├── agent.ts             # Bruce 门面 Agent（chat, listSkills）
-    └── index.ts             # 导出 bruce 层公共 API
+packages/ai/src/
+├── types.ts
+├── openai-provider.ts
+├── llm.ts
+└── index.ts
+
+packages/agent/src/
+├── types.ts
+├── event-stream.ts
+├── agent-loop.ts
+├── agent.ts
+└── index.ts
+
+packages/bruce/src/
+├── skill-registry.ts
+├── prompt-builder.ts
+├── run-script.ts
+├── tools.ts
+├── bruce-tools.ts
+├── agent.ts
+└── index.ts
+
+packages/app/src/
+├── index.ts    # 再导出
+└── cli.ts     # CLI + getDefaultSkillsDir / findGitRepoRoot
 ```
 
-以上结构按主题拆分，便于按「引擎 / 厂商 / 技能」分块阅读和迭代设计。
+以上按「monorepo → 引擎 → AI → 技能层 → 入口 → 链路 → 速查 → 索引」组织，便于分主题阅读与修改。

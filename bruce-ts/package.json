@@ -1,31 +1,16 @@
 {
-  "name": "@nano-bruce/agent",
-  "version": "0.1.0",
-  "description": "Bruce agent (TypeScript): client-side skill-enabled LLM agent. Python remains for backend services.",
+  "name": "bruce-ts",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Bruce agent monorepo (TypeScript).",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "bin": {
-    "bruce-agent": "dist/cli.js"
-  },
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/cli.js",
-    "dev": "tsc --watch"
+    "build": "node scripts/build.mjs",
+    "start": "node packages/app/dist/cli.js",
+    "clean": "npm run clean --workspaces",
+    "version:sync": "node scripts/sync-version.mjs"
   },
-  "files": [
-    "dist"
-  ],
-  "keywords": [
-    "agent",
-    "skills",
-    "llm"
-  ],
-  "license": "MIT",
-  "dependencies": {
-    "gray-matter": "^4.0.3",
-    "openai": "^4.77.0"
-  },
+  "workspaces": ["packages/*"],
   "devDependencies": {
     "@types/node": "^22.10.0",
     "typescript": "^5.7.2"
