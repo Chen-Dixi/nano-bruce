@@ -28,6 +28,8 @@ export interface BruceToolsOptions {
   basePath?: string;
   /** 自定义 read_file 实现，默认在 basePath 下读文件 */
   readFile?: (filePath: string) => string;
+  /** session 内已加载的 skill 名称集合，避免重复返回全文 */
+  loadedSkills?: Set<string>;
 }
 
 function defaultReadFile(filePath: string, base: string): string {
@@ -49,9 +51,10 @@ function defaultReadFile(filePath: string, base: string): string {
  * 返回 Bruce 默认四个工具（AgentTool 形态），供 agent 引擎执行
  */
 export function getBruceAgentTools(options: BruceToolsOptions): AgentTool[] {
-  const { registry } = options;
+  const { registry, loadedSkills } = options;
   const basePath = options.basePath ?? registry.skillsDir;
   const readFile = options.readFile ?? ((p: string) => defaultReadFile(p, basePath));
+  const loaded = loadedSkills ?? new Set<string>();
 
   return [
     {
@@ -83,11 +86,20 @@ export function getBruceAgentTools(options: BruceToolsOptions): AgentTool[] {
       name: "load_skill",
       label: "Load skill",
       description:
-        "Load a skill by name. Returns the full SKILL.md content. Use read_file with the skill directory for examples.",
+        "Load a skill by name. Returns the full SKILL.md content on first load; subsequent loads return a brief reference to save tokens.",
       parameters: LoadSkillSchema,
       async execute(_, params) {
         const skillName = params.skill_name.trim();
         if (!skillName) return { content: "Error: skill_name is required.", isError: true };
+
+        // 已加载过 → 返回简短引用，避免重复塞全文
+        if (loaded.has(skillName)) {
+          const skillDir = registry.getSkillDir(skillName);
+          return {
+            content: `[Skill: ${skillName}] Already loaded in this session. Refer to previous tool results for full content.\nDirectory: ${skillDir}`,
+          };
+        }
+
         const skillDir = registry.getSkillDir(skillName);
         if (!skillDir)
           return { content: `Error: skill not found: ${skillName}. Use list_skills to see available skills.`, isError: true };
@@ -96,6 +108,9 @@ export function getBruceAgentTools(options: BruceToolsOptions): AgentTool[] {
         const filePath = fs.existsSync(skillMd) ? skillMd : skillMdLower;
         if (!fs.existsSync(filePath))
           return { content: `Error: SKILL.md not found in ${skillDir}.`, isError: true };
+
+        // 标记为已加载
+        loaded.add(skillName);
         const content = fs.readFileSync(filePath, "utf-8");
         return {
           content:

@@ -33,6 +33,8 @@ export class Agent {
   private engine: EngineAgent;
   private registry: SkillRegistry;
   private promptBuilder: PromptBuilder;
+  /** session 内已加载的 skill 名称，避免重复返回全文 */
+  private loadedSkills = new Set<string>();
 
   constructor(options: AgentOptions) {
     const {
@@ -50,7 +52,9 @@ export class Agent {
     this.registry = skillRegistry;
     this.promptBuilder = promptBuilder;
     const systemPrompt = promptBuilder.buildSystemPrompt();
-    const skillTools = toolsEnabled ? getBruceAgentTools({ registry: skillRegistry }) : [];
+    const skillTools = toolsEnabled
+      ? getBruceAgentTools({ registry: skillRegistry, loadedSkills: this.loadedSkills })
+      : [];
     const metaTools =
       toolsEnabled && codingTools ? createCodingTools(cwd, codingToolsOptions) : [];
     const tools = [...skillTools, ...metaTools];
@@ -89,5 +93,15 @@ export class Agent {
 
   listSkills(): string[] {
     return this.registry.listSkills();
+  }
+
+  /** 获取当前 session 已加载的 skill 名称列表 */
+  getLoadedSkills(): string[] {
+    return [...this.loadedSkills];
+  }
+
+  /** 清空已加载的 skill 记录，下次 load_skill 会重新返回全文 */
+  resetLoadedSkills(): void {
+    this.loadedSkills.clear();
   }
 }
