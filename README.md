@@ -1,24 +1,15 @@
 # Bruce
 
-```
- _
-| |__   __ _ _ __   __ _ ___
-| '_ \ / _` | '_ \ / _` / __|
-| |_) | (_| | | | | (_| \__ \
-|_.__/ \__,_|_| |_|\__, |___/
-                   |___/
-         🥚 Infant Stage
-```
+🥚 Infant Stage
 
 > A minimal LLM Agent harness with skill capabilities.
 
-自实现的 LLM Agent 框架 —— 从 Infra 到 Model 到上层应用。
 
 ---
 
 ## ⚠️ 项目状态
 
-**Bruce 处于早期开发阶段（Infant）**。API 可能随时变化，不建议用于生产环境。
+**Nano-Bruce 处于早期开发阶段（Infant）**。API 可能随时变化，不建议用于生产环境。
 
 欢迎探索、反馈和贡献。
 
