@@ -15,6 +15,14 @@
 
 ---
 
+## 项目作用
+
+本仓库是作者**个人练习用的 agent harness 工程**：用可运行代码把「LLM + 工具 + 技能 + 多轮循环」串成一条清晰链路，便于**吃透 harness 层的实现与迭代方式**（对话循环、工具编排、上下文与流式事件等），而不是提供对外承诺的商业产品。
+
+`bruce-ts/` 中的 **agent-loop** 在流程上对照了 [badlogic/pi-mono](https://github.com/badlogic/pi-mono) 所体现的 Pi 系运行时思路；**本仓库不是 Pi 的 fork**，实现与依赖独立维护。
+
+---
+
 ## 架构
 
 ```
@@ -81,6 +89,12 @@ await agent.chat("帮我写一份周报");
 - **流式输出** —— 支持打字机效果与增量推送
 - **多 Provider** —— 统一接口适配 OpenAI、Moonshot、DeepSeek 等
 - **Coding Tools** —— 内置 read/write/edit/bash 元工具
+
+---
+
+## Acknowledgements
+
+实现参考了 [Armin Ronacher 对 Pi 的阐述](https://lucumr.pocoo.org/2026/1/31/pi/) 以及 [badlogic/pi-mono](https://github.com/badlogic/pi-mono) 
 
 ---
 
