@@ -21,9 +21,9 @@
 ┌─────────────────────────────────────────────────────┐
 │                    Applications                      │
 ├─────────────────────────────────────────────────────┤
-│  bruce-ts/          │  bruce/                       │
-│  TypeScript Client  │  Python Server                │
-│  本地运行、权限小     │  后端 API、技能校验            │
+│  bruce-ts/          │  bruce-py/                    │
+│  TypeScript Agent   │  Python Agent (Reference)     │
+│  本地运行、权限小     │  独立实现、历史参考             │
 ├─────────────────────────────────────────────────────┤
 │                    Agent Engine                      │
 ├─────────────────────────────────────────────────────┤
@@ -31,8 +31,8 @@
 └─────────────────────────────────────────────────────┘
 ```
 
-- **TypeScript Agent** (`bruce-ts/`) —— 客户端，本地运行，数据在用户侧。参考 [Pi](https://lucumr.pocoo.org/2026/1/31/pi/) 的极简设计。
-- **Python 服务** (`bruce/`) —— 后端 API、技能校验 CLI、审计与 SLA 场景。
+- **TypeScript Agent** (`bruce-ts/`) —— 当前主线实现，客户端本地运行，数据在用户侧。参考 [Pi](https://lucumr.pocoo.org/2026/1/31/pi/) 的极简设计。
+- **Python 实现** (`bruce-py/`) —— 历史/参考实现，当前不作为 TS 主线依赖。
 
 详见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
 
