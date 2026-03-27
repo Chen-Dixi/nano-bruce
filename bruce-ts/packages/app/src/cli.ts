@@ -37,7 +37,7 @@ function getDefaultSkillsDir(startDir: string): string {
   let dir = resolvedStart;
 
   while (true) {
-    candidates.push(path.join(dir, ".nano_bruce", "skills"));
+    candidates.push(path.join(dir, ".bruce", "skills"));
     candidates.push(path.join(dir, ".agents", "skills"));
     if (gitRoot && dir === gitRoot) break;
     const parent = path.dirname(dir);
