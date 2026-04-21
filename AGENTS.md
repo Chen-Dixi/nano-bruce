@@ -13,6 +13,10 @@ It is not a full handbook. Source-of-truth details live in `docs/`.
 ### 2) Where to read first
 
 - Start here for architecture overview: `ARCHITECTURE.md`
+- Then read project constitution:
+  - `specs/mission.md` (project goals and core problems)
+  - `specs/tech-stack.md` (technology choices and constraints)
+  - `specs/roadmap.md` (high-level implementation phases)
 - Then read structured docs:
   - `docs/design-docs/index.md`
   - `docs/product-specs/index.md`
@@ -25,10 +29,11 @@ It is not a full handbook. Source-of-truth details live in `docs/`.
 When information conflicts, use this order:
 
 1. Code + tests
-2. Active execution plans in `docs/exec-plans/active/`
-3. Product specs in `docs/product-specs/`
-4. Design docs in `docs/design-docs/`
-5. This `AGENTS.md` map
+2. Project constitution in `specs/` (mission, tech-stack, roadmap)
+3. Active execution plans in `docs/exec-plans/active/`
+4. Product specs in `docs/product-specs/`
+5. Design docs in `docs/design-docs/`
+6. This `AGENTS.md` map
 
 ### 4) Engineering rules for generated code
 
@@ -87,9 +92,10 @@ Update docs when you change:
 ### 10) Suggested first read path for new agents
 
 1. `AGENTS.md` (this map)
-2. `ARCHITECTURE.md`
-3. `docs/design-docs/index.md`
-4. `docs/PLANS.md`
-5. Target package docs (`bruce-ts/ARCHITECTURE.md` etc.)
+2. `specs/mission.md` (why this project exists)
+3. `specs/roadmap.md` (what phases to work on)
+4. `ARCHITECTURE.md`
+5. `bruce-ts/ARCHITECTURE.md` (package-level details)
+6. `docs/exec-plans/active/` (current work)
 
 Keep this file short and navigational. Move deep details into `docs/`.
