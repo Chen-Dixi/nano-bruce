@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "bruce-agent": "dist/cli.js"
+    "bruce": "dist/cli.js"
   },
   "exports": {
     ".": {
