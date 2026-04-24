@@ -104,4 +104,14 @@ export class Agent {
   resetLoadedSkills(): void {
     this.loadedSkills.clear();
   }
+
+  /** 获取当前对话历史（副本） */
+  getMessageHistory(): import("@nano-bruce/agent-core").AgentMessage[] {
+    return this.engine.getMessages();
+  }
+
+  /** 设置对话历史（用于恢复 session） */
+  setMessageHistory(messages: import("@nano-bruce/agent-core").AgentMessage[]): void {
+    this.engine.setMessages(messages);
+  }
 }

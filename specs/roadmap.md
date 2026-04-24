@@ -50,21 +50,44 @@ type: project
 
 ---
 
-## Phase 2: Memory System
+## Phase 2: Session Management 📋 (规划中)
+
+**目标：** 实现会话管理与 REPL 多轮对话
+
+### 2.1 Session 存储
+- Session 创建与 UUID 标识
+- SQLite 持久化存储（~/.bruce/sessions.db）
+- Session CRUD 操作
+
+### 2.2 CLI REPL
+- REPL 多轮对话循环
+- `-s <uuid>` 参数恢复指定 session
+- 每轮对话后自动保存
+- Ctrl+D 保存退出 / 双 Ctrl+C 强制退出
+
+**验证：** Agent 可恢复之前对话历史，支持连续多轮交互
+
+**预计工作量：** 2-3 天
+
+**需求文档：** `specs/2026-04-24-session-management/`
+
+---
+
+## Phase 3: Memory System
 
 **目标：** 实现对话记忆持久化与检索
 
-### 2.1 对话存储
+### 3.1 对话存储
 - 实现会话持久化存储（SQLite 或 JSON 文件）
 - 对话历史 CRUD 操作
 - 会话元数据管理（创建时间、标签等）
 
-### 2.2 上下文管理
+### 3.2 上下文管理
 - Token 计数与预算管理
 - 基础上下文压缩策略（截断旧消息）
 - 关键信息保留标记
 
-### 2.3 记忆检索（可选）
+### 3.3 记忆检索（可选）
 - 基于关键词的对话检索
 - 摘要生成（需调用 LLM）
 
@@ -74,20 +97,20 @@ type: project
 
 ---
 
-## Phase 3: Human-in-the-Loop
+## Phase 4: Human-in-the-Loop
 
 **目标：** Agent 可主动询问用户，处理模糊指令
 
-### 3.1 AskUserQuestion 功能
+### 4.1 AskUserQuestion 功能
 - 实现 Agent 主动提问机制
 - 支持多选/单选/文本输入
-- 与 Tool System 集成
+- 与 Tool System 成
 
-### 3.2 确认流程
+### 4.2 确认流程
 - 危险操作前的确认提示
 - 可配置的自动确认规则
 
-### 3.3 澄清对话
+### 4.3 澄清对话
 - 模糊指令的多轮澄清
 - 意图确认机制
 
@@ -97,21 +120,21 @@ type: project
 
 ---
 
-## Phase 4: Terminal UI
+## Phase 5: Terminal UI
 
 **目标：** 提供更友好的终端交互体验
 
-### 4.1 Rich Output
+### 5.1 Rich Output
 - 实现 Markdown 渲染
 - 代码高亮显示
 - 流式打字机效果优化
 
-### 4.2 交互组件
+### 5.2 交互组件
 - 进度条与状态展示
 - 交互式选择列表
 - 实时日志面板
 
-### 4.3 主题支持
+### 5.3 主题支持
 - 可配置的颜色主题
 - 紧凑/宽松布局切换
 
@@ -123,21 +146,21 @@ type: project
 
 ---
 
-## Phase 5: Agent Design Patterns
+## Phase 6: Agent Design Patterns
 
 **目标：** 支持更复杂的 Agent 推理模式
 
-### 5.1 Plan-and-Execute
+### 6.1 Plan-and-Execute
 - 任务分解与规划
 - 子任务顺序执行
 - 执行结果反馈与重规划
 
-### 5.2 Tree of Thought
+### 6.2 Tree of Thought
 - 多分支推理实现
 - 思路评估与剪枝
 - 最优路径选择
 
-### 5.3 Reflection
+### 6.3 Reflection
 - 自我评估机制
 - 迭代改进循环
 - 质量检查点
@@ -148,21 +171,21 @@ type: project
 
 ---
 
-## Phase 6: Testing Framework
+## Phase 7: Testing Framework
 
 **目标：** 建立 Agent 行为验证体系
 
-### 6.1 测试 DSL
+### 7.1 测试 DSL
 - 定义 Agent 测试用例格式
 - Mock Provider 支持
 - 断言与验证工具
 
-### 6.2 评估工具
+### 7.2 评估工具
 - 输出质量评估指标
 - 回归测试框架
 - 性能基准测试
 
-### 6.3 CI 集成
+### 7.3 CI 集成
 - 自动化测试流水线
 - 测试覆盖率报告
 
@@ -172,21 +195,21 @@ type: project
 
 ---
 
-## Phase 7: Observability
+## Phase 8: Observability
 
 **目标：** 建立 Agent 运行时可观测能力
 
-### 7.1 指标收集
+### 8.1 指标收集
 - Token 使用统计
 - 请求延迟监控
 - 成本追踪
 
-### 7.2 执行追踪
+### 8.2 执行追踪
 - 决策链路可视化
 - Tool 调用追踪
 - 错误链路分析
 
-### 7.3 调试工具
+### 8.3 调试工具
 - 运行时状态检查
 - 消息流可视化
 - 断点与单步执行（概念验证）
@@ -203,21 +226,22 @@ type: project
 |-------|------|--------|------|------|
 | 0 | 基础设施 | P0 | - | ✅ 完成 |
 | 1 | Configuration System | P0 | - | ✅ 完成 |
-| 2 | Memory System | P0 | Phase 1 | 📋 规划中 |
-| 3 | Human-in-the-Loop | P1 | Phase 0 | 📋 规划中 |
-| 4 | Terminal UI | P1 | Phase 0 | 📋 规划中 |
-| 5 | Agent Design Patterns | P1 | Phase 2, 3 | 📋 规划中 |
-| 6 | Testing Framework | P2 | Phase 0-5 | 📋 规划中 |
-| 7 | Observability | P2 | Phase 0-5 | 📋 规划中 |
+| 2 | Session Management | P0 | Phase 1 | 📋 规划中 |
+| 3 | Memory System | P0 | Phase 2 | 📋 规划中 |
+| 4 | Human-in-the-Loop | P1 | Phase 0 | 📋 规划中 |
+| 5 | Terminal UI | P1 | Phase 0 | 📋 规划中 |
+| 6 | Agent Design Patterns | P1 | Phase 3, 4 | 📋 规划中 |
+| 7 | Testing Framework | P2 | Phase 0-6 | 📋 规划中 |
+| 8 | Observability | P2 | Phase 0-6 | 📋 规划中 |
 
 ---
 
 ## 执行建议
 
-1. **Phase 1 → Phase 2 连续执行** —— 配置系统是记忆系统的基础
-2. **Phase 3 和 Phase 4 可并行** —— 互不依赖，可根据团队资源安排
-3. **Phase 5 依赖 Memory** —— 复杂推理需要上下文支持
-4. **Phase 6-7 可穿插进行** —— 测试和可观测性可随功能开发同步建设
+1. **Phase 1 → Phase 2 → Phase 3 连续执行** —— 配置系统是会话管理的基础，会话管理是记忆系统的基础
+2. **Phase 4 和 Phase 5 可并行** —— 互不依赖，可根据团队资源安排
+3. **Phase 6 依赖 Memory** —— 复杂推理需要上下文支持
+4. **Phase 7-8 可穿插进行** —— 测试和可观测性可随功能开发同步建设
 
 ---
 

@@ -157,6 +157,16 @@ export class EngineAgent {
     this._messages = [];
   }
 
+  /** 获取当前对话历史（副本） */
+  getMessages(): AgentMessage[] {
+    return [...this._messages];
+  }
+
+  /** 设置对话历史（用于恢复 session） */
+  setMessages(messages: AgentMessage[]): void {
+    this._messages = [...messages];
+  }
+
   /** 订阅 agent 流事件（message_start、message_update、message_end、turn_end 等），返回取消订阅函数 */
   subscribe(fn: (e: AgentEvent) => void): () => void {
     this._listeners.add(fn);
