@@ -29,8 +29,16 @@ export type {
   ThinkingContent,
   ToolCallContent,
   ToolResultMessage,
-  UserMessage
+  UserMessage,
+  KnownProvider,
 } from "./types.js";
+export type {
+  ProviderSettings,
+  UserPreferences,
+  WorkingDirSettings,
+  SettingsConfig,
+} from "./config-types.js";
+export { DEFAULT_SETTINGS, DEFAULT_SETTINGS_FILE, DEFAULT_BRUCE_DIR } from "./config-types.js";
 
 export type ProviderName = "openai" | "moonshot" | "deepseek";
 

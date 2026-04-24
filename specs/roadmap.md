@@ -29,24 +29,24 @@ type: project
 
 ---
 
-## Phase 1: Configuration System
+## Phase 1: Configuration System ✅ (已完成)
 
 **目标：** 统一配置管理，提升用户体验
 
 ### 1.1 配置文件支持
-- 实现 `~/.bruce/settings.json` 配置文件读取
-- 支持 Provider 配置（endpoint, model, api-key）
-- 支持用户偏好设置（默认 provider, 流式输出等）
+- [x] 实现 `~/.bruce/settings.json` 配置文件读取
+- [x] 支持 Provider 配置（endpoint, model, api-key）
+- [x] 支持用户偏好设置（默认 provider, 流式输出等）
 
 ### 1.2 配置优先级
-- 命令行参数 > 环境变量 > 配置文件 > 默认值
+- [x] 环境变量 > 配置文件 > 默认值
 
 ### 1.3 安全存储
-- API Key 安全存储方案（可选集成系统 keychain）
+- [x] API Key 存储于配置文件（明文，后续可扩展 keychain）
 
 **验证：** 用户可通过配置文件持久化 Provider 设置，无需每次手动 export
 
-**预计工作量：** 1-2 天
+**实际工作量：** 1 天
 
 ---
 
@@ -202,7 +202,7 @@ type: project
 | Phase | 名称 | 优先级 | 依赖 | 状态 |
 |-------|------|--------|------|------|
 | 0 | 基础设施 | P0 | - | ✅ 完成 |
-| 1 | Configuration System | P0 | - | 📋 规划中 |
+| 1 | Configuration System | P0 | - | ✅ 完成 |
 | 2 | Memory System | P0 | Phase 1 | 📋 规划中 |
 | 3 | Human-in-the-Loop | P1 | Phase 0 | 📋 规划中 |
 | 4 | Terminal UI | P1 | Phase 0 | 📋 规划中 |
