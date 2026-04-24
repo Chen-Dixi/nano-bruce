@@ -98,6 +98,18 @@ Numbered task groups with checklist format:
 
 ### validation.md
 
+Before writing validation.md, read `specs/tech-stack.md` to identify the project's language/tech stack and select appropriate test framework:
+
+| Tech Stack | Test Framework | Example |
+|------------|----------------|---------|
+| TypeScript | Vitest | `import { test, expect } from 'vitest'` |
+| JavaScript | Vitest / Jest | `import { test, expect } from 'vitest'` |
+| Python | pytest | `def test_xxx(): assert ...` |
+| Go | Go testing | `func TestXxx(t *testing.T) { ... }` |
+| Rust | cargo test | `#[test] fn test_xxx() { ... }` |
+
+Write test cases using the selected framework's syntax:
+
 ```markdown
 # [Feature Name] Validation
 
@@ -105,11 +117,24 @@ Numbered task groups with checklist format:
 - Criterion 1: How to verify
 - Criterion 2: How to verify
 
+## Test Framework
+- Using: [Framework Name] (based on specs/tech-stack.md)
+
 ## Test Cases
+
+### Unit Tests
+```[language]
+// Example test case using selected framework
+test('description', () => {
+  expect(true).toBe(true);
+});
+```
+
+### Integration Tests
 - Test 1: Description + expected outcome
 
 ## Merge Checklist
-- [ ] All tests pass
+- [ ] All tests pass (`npm test` / `pytest` / etc.)
 - [ ] Documentation updated
 - [ ] No regressions
 ```
