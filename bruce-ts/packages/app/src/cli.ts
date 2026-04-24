@@ -2,15 +2,29 @@
 /**
  * Bruce 命令行入口
  *
- * 运行：node dist/cli.js [--skills 目录] [--provider 提供方] [--message "用户消息"]
- * 示例：npm start -- --provider moonshot --message "列出可用的 skills"
+ * 运行：node dist/cli.js [--skills 目录] [--message "用户消息"]
+ * 示例：npm start -- --message "列出可用的 skills"
+ *
+ * 配置：通过 ~/.bruce/settings.json 或环境变量配置 Provider
+ * 初始化：bruce init 生成配置文件模板
  */
+
+// 抑制第三方依赖的 punycode deprecation warning（需在导入前设置）
+const _process: any = process;
+const _originalEmit = _process.emit;
+_process.emit = function(event: string, warning: Error) {
+  if (event === 'warning' && warning?.name === 'DeprecationWarning' && warning?.message?.includes('punycode')) {
+    return false;
+  }
+  return _originalEmit.apply(_process, arguments);
+};
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Agent, SkillRegistry, PromptBuilder } from "@nano-bruce/bruce";
 import { createModel } from "@nano-bruce/ai";
+import { getEffectiveConfig, initSettings, getBruceDir, mergeSettings } from "./config/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,7 +43,7 @@ function findGitRepoRoot(startDir: string): string | null {
   return null;
 }
 
-/** 从 startDir 向上到 git 根，收集各层候选的 skills 目录（.nano_bruce/skills 或 .agents/skills），返回第一个存在的 */
+/** 从 startDir 向上到 git 根，收集各层候选的 skills 目录，返回第一个存在的 */
 function getDefaultSkillsDir(startDir: string): string {
   const resolvedStart = path.resolve(startDir);
   const gitRoot = findGitRepoRoot(resolvedStart);
@@ -48,37 +62,38 @@ function getDefaultSkillsDir(startDir: string): string {
   for (const d of candidates) {
     if (fs.existsSync(d) && fs.statSync(d).isDirectory()) return d;
   }
+
+  // 尝试从配置获取 skillsDir
+  const settings = mergeSettings();
+  const configSkillsDir = settings.workingDir?.skillsDir;
+  if (configSkillsDir && fs.existsSync(configSkillsDir)) {
+    return configSkillsDir;
+  }
+
+  // 默认使用 ~/.bruce/skills
+  const bruceSkillsDir = path.join(getBruceDir(), "skills");
+  if (fs.existsSync(bruceSkillsDir)) {
+    return bruceSkillsDir;
+  }
+
   return gitRoot ? path.join(gitRoot, "bruce", "skills") : path.resolve(__dirname, "..", "..", "..", "..", "bruce", "skills");
-}
-
-function getEnv(key: string): string {
-  const v = process.env[key];
-  if (!v) {
-    console.error(`Missing env: ${key}`);
-    process.exit(1);
-  }
-  return v;
-}
-
-function getEnvKey(provider: string): string {
-  switch (provider) {
-    case "moonshot": return "MOONSHOT_API_KEY";
-    case "deepseek": return "DEEPSEEK_API_KEY";
-    default: return "OPENAI_API_KEY";
-  }
 }
 
 async function main() {
   const args = process.argv.slice(2);
+
+  // 处理 init 命令
+  if (args[0] === "init") {
+    initSettings();
+    return;
+  }
+
   let skillsDir = getDefaultSkillsDir(process.cwd());
-  let provider = "moonshot";
   let message = "列出当前可用的 skills，并简要说明各自用途。";
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--skills" && args[i + 1]) {
       skillsDir = path.resolve(args[++i]);
-    } else if (args[i] === "--provider" && args[i + 1]) {
-      provider = args[++i];
     } else if (args[i] === "--message" && args[i + 1]) {
       message = args[++i];
     }
@@ -87,21 +102,22 @@ async function main() {
   const registry = new SkillRegistry(skillsDir);
   registry.load();
 
-  const providerName = provider === "moonshot" ? "moonshot" : provider === "deepseek" ? "deepseek" : "openai";
-  const model = createModel(providerName);
-  const apiKey = getEnv(getEnvKey(provider));
+  // 从配置获取 Provider 信息
+  const config = getEffectiveConfig();
+  const model = createModel(config.provider as any, config.model);
+
   const agent = new Agent({
     model,
     skillRegistry: registry,
     promptBuilder: new PromptBuilder(registry),
     toolsEnabled: true,
-    getApiKey: () => apiKey,
+    getApiKey: () => config.apiKey,
   });
 
   agent.subscribe((event) => {
     if (event.type !== "message_update") return;
     const e = event.assistantMessageEvent;
-    // 只对面向用户的文本做打字机效果，不打印工具调用的 JSON（避免出现 "{}" 或参数片段）
+    // 只对面向用户的文本做打字机效果
     if (e.type === "text_delta" || e.type === "thinking_delta") {
       process.stdout.write(e.delta);
     } else if (e.type === "text_end" || e.type === "thinking_end") {
@@ -109,7 +125,6 @@ async function main() {
     }
   });
   await agent.chat(message);
-  // console.log(response);
 }
 
 main().catch((err) => {

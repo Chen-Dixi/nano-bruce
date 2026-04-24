@@ -6,3 +6,13 @@ export { createProvider, createOpenAIProvider, createLLM, chatCompletion, type P
 export { EngineAgent, agentLoop, agentLoopContinue, createAgentStream } from "@nano-bruce/agent-core";
 export type { EngineAgentOptions, EngineAgentState } from "@nano-bruce/agent-core";
 export type { AgentMessage, AgentTool, AgentEvent } from "@nano-bruce/agent-core";
+
+// 配置模块
+export {
+  getBruceDir,
+  getSettingsPath,
+  loadSettingsFromFile,
+  mergeSettings,
+  getEffectiveConfig,
+  initSettings,
+} from "./config/index.js";
