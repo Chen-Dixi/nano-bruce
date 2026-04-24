@@ -48,16 +48,50 @@
 
 ## 快速开始
 
+### 安装
+
 ```bash
 cd bruce-ts
 npm install
 npm run build
-
-export MOONSHOT_API_KEY=your_key
-npm start -- --provider moonshot --message "列出可用的 skills"
+npm link  # 全局安装 bruce 命令
 ```
 
-支持的 Provider：`moonshot`、`deepseek`、`openai`
+### 初始化配置
+
+```bash
+bruce init
+# 创建 ~/.bruce/settings.json，请填入 API Key
+```
+
+或直接设置环境变量：
+
+```bash
+export MOONSHOT_API_KEY=your_key
+```
+
+### CLI 使用
+
+```bash
+# 进入 REPL 多轮对话（自动创建 session）
+bruce
+
+# 单轮对话（不创建 session）
+bruce --message "列出可用的 skills"
+
+# 恢复之前的 session
+bruce -s <session-uuid>
+
+# 列出所有 session
+bruce sessions
+```
+
+### REPL 退出方式
+
+- **Ctrl+D** —— 保存 session 后退出
+- **双 Ctrl+C** —— 强制退出（不保存最后一轮）
+
+支持的 Provider：`moonshot`、`deepseek`、`openai`、`anthropic`
 
 ---
 
@@ -87,8 +121,10 @@ await agent.chat("帮我写一份周报");
 - **极简引擎** —— 核心 Agent 循环自实现，无外部框架依赖
 - **技能系统** —— 通过 SKILL.md 定义技能，自动发现与加载
 - **流式输出** —— 支持打字机效果与增量推送
-- **多 Provider** —— 统一接口适配 OpenAI、Moonshot、DeepSeek 等
+- **多 Provider** —— 统一接口适配 OpenAI、Moonshot、DeepSeek、Anthropic 等
 - **Coding Tools** —— 内置 read/write/edit/bash 元工具
+- **Session 管理** —— 多轮对话持久化，支持恢复历史会话
+- **配置系统** —— ~/.bruce/settings.json 统一管理 Provider 与偏好
 
 ---
 
