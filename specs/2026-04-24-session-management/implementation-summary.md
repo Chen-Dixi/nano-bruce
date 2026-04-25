@@ -7,7 +7,8 @@ type: project
 # Session Management Implementation Summary
 
 ## 实现日期
-2026-04-24
+- 2026-04-24：初始实现
+- 2026-04-25：优化为延迟创建 session
 
 ## 实现状态
 ✅ 完成
@@ -50,10 +51,10 @@ type: project
 - ✅ Session 删除
 
 ### CLI REPL
-- ✅ 无参数启动进入 REPL（创建新 session）
+- ✅ 无参数启动进入 REPL（延迟创建 session，用户提交第一条消息后才创建）
 - ✅ `-s <uuid>` 恢复指定 session
 - ✅ 每轮对话后自动保存
-- ✅ Ctrl+D 保存退出
+- ✅ Ctrl+D 保存退出（若无消息则不创建 session）
 - ✅ 双 Ctrl+C 强制退出（不保存）
 - ✅ `--message` 单轮模式兼容
 - ✅ `bruce sessions` 列出所有 session

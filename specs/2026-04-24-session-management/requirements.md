@@ -16,6 +16,7 @@ type: project
 - 每轮对话后自动保存
 - Ctrl+D 保存退出 / 双 Ctrl+C 强制退出
 - `bruce sessions` 命令列出所有 session
+- **延迟创建 session** —— 启动 REPL 时不立即创建 session，用户提交第一条消息后才创建，避免产生空白 session
 
 ### Out of Scope
 - Session 删除功能（`bruce delete <uuid>`）
@@ -30,6 +31,7 @@ type: project
 | 纯 UUID 文件命名 | 简洁清晰，session 表直接用 uuid 作为主键 |
 | 每轮自动保存 | 减少用户心智负担，防止意外丢失对话 |
 | Ctrl+D + 双 Ctrl+C | 区分"保存退出"与"强制退出"两种意图 |
+| 延迟创建 session | 避免产生大量空白 session，仅在用户实际输入后才创建 |
 
 ## Context
 

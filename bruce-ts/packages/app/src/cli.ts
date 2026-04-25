@@ -202,9 +202,10 @@ async function runRepl(
   skillsDir: string
 ): Promise<void> {
   const storage = new SessionStorage();
-  let session: Session;
+  let session: Session | null = null;
+  let sessionCreated = false;
 
-  // 加载或创建 session
+  // 加载已有 session（如果指定了 uuid）
   if (sessionUuid) {
     const loaded = storage.loadSession(sessionUuid);
     if (!loaded) {
@@ -213,15 +214,11 @@ async function runRepl(
       process.exit(1);
     }
     session = loaded;
+    sessionCreated = true;
     console.log(`Resumed session: ${sessionUuid}`);
     console.log(`Messages in history: ${session.messages.length}`);
-  } else {
-    session = storage.createSession({
-      cwd: process.cwd(),
-      skillsDir,
-    });
-    console.log(`New session: ${session.uuid}`);
   }
+  // 不立即创建新 session，等用户输入第一条消息后再创建
 
   const registry = new SkillRegistry(skillsDir);
   registry.load();
@@ -239,7 +236,7 @@ async function runRepl(
   });
 
   // 恢复已有消息到 agent
-  if (session.messages.length > 0) {
+  if (session && session.messages.length > 0) {
     agent.setMessageHistory(session.messages);
     console.log(`Restored ${session.messages.length} messages from history`);
   }
@@ -291,12 +288,15 @@ async function runRepl(
       ctrlCCount = 0;
       if (ctrlCTimer) clearTimeout(ctrlCTimer);
 
-      // 添加用户消息到 session
-      session.messages.push({
-        role: "user",
-        content: userInput.trim(),
-        timestamp: Date.now(),
-      });
+      // 如果 session 还未创建，先创建（延迟创建，避免空白 session）
+      if (!session) {
+        session = storage.createSession({
+          cwd: process.cwd(),
+          skillsDir,
+        });
+        sessionCreated = true;
+        console.log(`Created session: ${session.uuid}`);
+      }
 
       // 调用 agent
       try {
@@ -315,8 +315,14 @@ async function runRepl(
   } catch (err) {
     // Ctrl+D 会触发 AbortError
     if (err instanceof Error && (err.name === "AbortError" || (err as any).code === "ABORT_ERR")) {
-      console.log("\nSaving session and exiting...");
-      storage.saveSession(session);
+      // 只有已创建 session 才保存
+      if (session && sessionCreated) {
+        console.log("\nSaving session and exiting...");
+        session.messages = agent.getMessageHistory();
+        storage.saveSession(session);
+      } else {
+        console.log("\nExiting (no session created)...");
+      }
       storage.close();
       process.exit(0);
     }
