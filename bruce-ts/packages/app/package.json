@@ -1,7 +1,7 @@
 {
-  "name": "@nano-bruce/agent",
+  "name": "@nano-bruce/app",
   "version": "0.1.1",
-  "description": "Bruce agent entry: CLI and re-exports.",
+  "description": "Bruce CLI app and re-exports.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

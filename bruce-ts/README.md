@@ -36,7 +36,7 @@ npm start -- --skills /path/to/skills --message "..."
 ## 作为库使用
 
 ```ts
-import { Agent, createProvider, PromptBuilder, SkillRegistry } from "@nano-bruce/agent";
+import { Agent, createProvider, PromptBuilder, SkillRegistry } from "@nano-bruce/app";
 
 const registry = new SkillRegistry("./bruce/skills");
 registry.load();

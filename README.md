@@ -98,7 +98,7 @@ bruce sessions
 ## 作为库使用
 
 ```typescript
-import { Agent, createModel, SkillRegistry, PromptBuilder } from "@nano-bruce/agent";
+import { Agent, createModel, SkillRegistry, PromptBuilder } from "@nano-bruce/app";
 
 const registry = new SkillRegistry("./skills");
 registry.load();

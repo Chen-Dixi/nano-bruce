@@ -1,5 +1,5 @@
 /**
- * @nano-bruce/agent — 入口：agent 引擎 + 厂商适配 + Bruce 技能层
+ * @nano-bruce/app — 入口：agent 引擎 + 厂商适配 + Bruce 技能层 + CLI
  */
 export { Agent, type AgentOptions, getBruceAgentTools, type BruceToolsOptions, PromptBuilder, SkillRegistry, type SkillProperties, getDefaultTools, runSkillScript, type RunScriptResult } from "@nano-bruce/bruce";
 export { createProvider, createOpenAIProvider, createLLM, chatCompletion, type ProviderName, type LLMProvider, type ChatMessage, type ChatResult, type LLMOptions } from "@nano-bruce/ai";
