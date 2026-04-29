@@ -211,8 +211,8 @@ export function agentLoop(
 ): ReturnType<typeof createAgentStream> {
   const stream = createAgentStream();
   const currentContext: AgentContext = {
-    ...context,
-    messages: [...context.messages, ...prompts],
+    ...context, // 对象展开语法（object spread），意思是把 context 里的所有一层属性拷贝到新对象里。
+    messages: [...context.messages, ...prompts], // 把 context.messages 和 prompts 合并成新的 messages 数组。
   };
   const newMessages: AgentMessage[] = [...prompts];
 
