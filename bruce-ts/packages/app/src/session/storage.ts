@@ -31,10 +31,11 @@ export class SessionStorage {
   }
 
   private initTables(): void {
-    // 创建表（如果不存在）
+    // 创建表（包含 cwd 列）
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         uuid TEXT PRIMARY KEY,
+        cwd TEXT,
         messages_json TEXT NOT NULL,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
@@ -42,13 +43,13 @@ export class SessionStorage {
       )
     `);
 
-    // 迁移：检查是否需要添加 cwd 列
+    // 迁移：旧表可能没有 cwd 列，检查并添加
     const columns = this.db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
     if (!columns.some(col => col.name === "cwd")) {
       this.db.exec("ALTER TABLE sessions ADD COLUMN cwd TEXT");
     }
 
-    // 创建索引（在表结构确定后）
+    // 创建索引
     this.db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_cwd ON sessions(cwd)");
     this.db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at)");
   }
