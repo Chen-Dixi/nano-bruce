@@ -31,6 +31,7 @@ export class SessionStorage {
   }
 
   private initTables(): void {
+    // 创建表（如果不存在）
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         uuid TEXT PRIMARY KEY,
@@ -40,6 +41,16 @@ export class SessionStorage {
         metadata_json TEXT
       )
     `);
+
+    // 迁移：检查是否需要添加 cwd 列
+    const columns = this.db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
+    if (!columns.some(col => col.name === "cwd")) {
+      this.db.exec("ALTER TABLE sessions ADD COLUMN cwd TEXT");
+    }
+
+    // 创建索引（在表结构确定后）
+    this.db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_cwd ON sessions(cwd)");
+    this.db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at)");
   }
 
   /** 创建新 session（自动生成 UUID） */
@@ -79,11 +90,13 @@ export class SessionStorage {
   /** 保存/更新 session */
   saveSession(session: Session): void {
     session.updatedAt = Date.now();
+    const cwd = session.metadata?.cwd ?? null;
     this.db.prepare(`
-      INSERT OR REPLACE INTO sessions (uuid, messages_json, created_at, updated_at, metadata_json)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO sessions (uuid, cwd, messages_json, created_at, updated_at, metadata_json)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       session.uuid,
+      cwd,
       JSON.stringify(session.messages),
       session.createdAt,
       session.updatedAt,
@@ -95,17 +108,17 @@ export class SessionStorage {
   listSessions(filterByCwd?: string): SessionListItem[] {
     let rows;
     if (filterByCwd) {
+      // 使用 cwd 列精确查询（有索引，高效）
       rows = this.db.prepare(`
-        SELECT uuid, created_at, updated_at, messages_json, metadata_json
+        SELECT uuid, created_at, updated_at, messages_json
         FROM sessions
-        WHERE metadata_json LIKE ?
+        WHERE cwd = ?
         ORDER BY updated_at DESC
-      `).all(`%"cwd":"${filterByCwd}"%`) as Array<{
+      `).all(filterByCwd) as Array<{
         uuid: string;
         created_at: number;
         updated_at: number;
         messages_json: string;
-        metadata_json: string | null;
       }>;
     } else {
       rows = this.db.prepare(`
