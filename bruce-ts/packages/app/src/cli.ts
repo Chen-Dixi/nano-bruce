@@ -4,9 +4,11 @@
  *
  * 运行模式：
  * - `bruce` → 进入 REPL 多轮对话
- * - `bruce -s <uuid>` → 恢复指定 session 并进入 REPL
+ * - `bruce -s <uuid>` 或 `bruce --session <uuid>` → 恢复指定 session
  * - `bruce --message "xxx"` → 单轮对话（不创建 session）
  * - `bruce init` → 初始化配置文件
+ * - `bruce list-sessions` → 列出当前目录下的 session
+ * - `bruce list-sessions -g` → 列出所有 session
  *
  * 退出方式：
  * - Ctrl+D → 保存 session 后优雅退出
@@ -104,18 +106,23 @@ interface CliArgs {
   message?: string;
   skillsDir?: string;
   isInit: boolean;
-  isSessions: boolean;
+  isListSessions: boolean;
+  listAllSessions: boolean; // -g 参数
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const result: CliArgs = { isInit: false, isSessions: false };
+  const result: CliArgs = { isInit: false, isListSessions: false, listAllSessions: false };
 
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "init") {
       result.isInit = true;
-    } else if (argv[i] === "sessions") {
-      result.isSessions = true;
+    } else if (argv[i] === "list-sessions") {
+      result.isListSessions = true;
+    } else if (argv[i] === "-g" && result.isListSessions) {
+      result.listAllSessions = true;
     } else if (argv[i] === "-s" && argv[i + 1]) {
+      result.sessionUuid = argv[++i];
+    } else if (argv[i] === "--session" && argv[i + 1]) {
       result.sessionUuid = argv[++i];
     } else if (argv[i] === "--message" && argv[i + 1]) {
       result.message = argv[++i];
@@ -159,18 +166,25 @@ async function runSingleTurn(
   await agent.chat(message);
 }
 
-/** 列出所有 sessions */
-function listSessions(): void {
+/** 列出 sessions（可选按 cwd 过滤） */
+function listSessions(showAll: boolean): void {
   const storage = new SessionStorage();
-  const sessions = storage.listSessions();
+  const cwd = showAll ? undefined : process.cwd();
+  const sessions = storage.listSessions(cwd);
   storage.close();
 
   if (sessions.length === 0) {
-    console.log("No sessions found.");
+    if (showAll) {
+      console.log("No sessions found.");
+    } else {
+      console.log(`No sessions found in current directory: ${cwd}`);
+      console.log("Use `bruce list-sessions -g` to see all sessions.");
+    }
     return;
   }
 
-  console.log("\nSessions:");
+  const scopeLabel = showAll ? "All sessions:" : `Sessions in ${cwd}:`;
+  console.log(`\n${scopeLabel}`);
   console.log("─".repeat(70));
   console.log(
     "Session ID".padEnd(36) +
@@ -339,9 +353,9 @@ async function main() {
     return;
   }
 
-  // 处理 sessions 命令
-  if (args.isSessions) {
-    listSessions();
+  // 处理 list-sessions 命令
+  if (args.isListSessions) {
+    listSessions(args.listAllSessions);
     return;
   }
 

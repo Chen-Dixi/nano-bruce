@@ -9,6 +9,7 @@ type: project
 ## 实现日期
 - 2026-04-24：初始实现
 - 2026-04-25：优化为延迟创建 session
+- 2026-04-30：改进 CLI 命令（`--session`、`list-sessions`、按目录过滤）
 
 ## 实现状态
 ✅ 完成
@@ -52,12 +53,13 @@ type: project
 
 ### CLI REPL
 - ✅ 无参数启动进入 REPL（延迟创建 session，用户提交第一条消息后才创建）
-- ✅ `-s <uuid>` 恢复指定 session
+- ✅ `-s <uuid>` 或 `--session <uuid>` 恢复指定 session
 - ✅ 每轮对话后自动保存
 - ✅ Ctrl+D 保存退出（若无消息则不创建 session）
 - ✅ 双 Ctrl+C 强制退出（不保存）
 - ✅ `--message` 单轮模式兼容
-- ✅ `bruce sessions` 列出所有 session
+- ✅ `bruce list-sessions` 列出当前目录下的 session（按 cwd 过滤）
+- ✅ `bruce list-sessions -g` 列出所有 session（全局）
 
 ---
 
@@ -118,11 +120,15 @@ CREATE TABLE sessions (
 # 创建新 session 并进入 REPL
 bruce
 
-# 列出所有 session
-bruce sessions
+# 列出当前目录下的 session
+bruce list-sessions
+
+# 列出所有 session（全局）
+bruce list-sessions -g
 
 # 恢复已有 session
 bruce -s abc12345-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+bruce --session abc12345-xxxx-xxxx-xxxx-xxxxxxxxxxxx  # 长参数形式
 
 # 单轮对话（不创建 session）
 bruce --message "列出可用的 skills"

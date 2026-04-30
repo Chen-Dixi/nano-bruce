@@ -91,14 +91,34 @@ export class SessionStorage {
     );
   }
 
-  /** 列出所有 session（简要信息） */
-  listSessions(): SessionListItem[] {
-    const rows = this.db.prepare("SELECT uuid, created_at, updated_at, messages_json FROM sessions ORDER BY updated_at DESC").all() as Array<{
-      uuid: string;
-      created_at: number;
-      updated_at: number;
-      messages_json: string;
-    }>;
+  /** 列出 session（可选按 cwd 过滤） */
+  listSessions(filterByCwd?: string): SessionListItem[] {
+    let rows;
+    if (filterByCwd) {
+      rows = this.db.prepare(`
+        SELECT uuid, created_at, updated_at, messages_json, metadata_json
+        FROM sessions
+        WHERE metadata_json LIKE ?
+        ORDER BY updated_at DESC
+      `).all(`%"cwd":"${filterByCwd}"%`) as Array<{
+        uuid: string;
+        created_at: number;
+        updated_at: number;
+        messages_json: string;
+        metadata_json: string | null;
+      }>;
+    } else {
+      rows = this.db.prepare(`
+        SELECT uuid, created_at, updated_at, messages_json
+        FROM sessions
+        ORDER BY updated_at DESC
+      `).all() as Array<{
+        uuid: string;
+        created_at: number;
+        updated_at: number;
+        messages_json: string;
+      }>;
+    }
 
     return rows.map(row => ({
       uuid: row.uuid,

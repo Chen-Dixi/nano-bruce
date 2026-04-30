@@ -73,7 +73,7 @@ export MOONSHOT_API_KEY=your_key
 ### CLI 使用
 
 ```bash
-# 进入 REPL 多轮对话（自动创建 session）
+# 进入 REPL 多轮对话（延迟创建 session，首次输入后创建）
 bruce
 
 # 单轮对话（不创建 session）
@@ -81,9 +81,13 @@ bruce --message "列出可用的 skills"
 
 # 恢复之前的 session
 bruce -s <session-uuid>
+bruce --session <session-uuid>  # 同上，长参数形式
 
-# 列出所有 session
-bruce sessions
+# 列出当前目录下的 session
+bruce list-sessions
+
+# 列出所有 session（全局）
+bruce list-sessions -g
 ```
 
 ### REPL 退出方式

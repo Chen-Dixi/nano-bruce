@@ -12,10 +12,11 @@ type: project
 - Session 创建与 UUID 标识
 - Session 持久化存储（SQLite）
 - REPL 多轮对话支持
-- `-s <uuid>` 参数恢复指定 session
+- `-s <uuid>` 或 `--session <uuid>` 参数恢复指定 session
 - 每轮对话后自动保存
 - Ctrl+D 保存退出 / 双 Ctrl+C 强制退出
-- `bruce sessions` 命令列出所有 session
+- `bruce list-sessions` 命令列出当前目录下的 session（默认按 cwd 过滤）
+- `bruce list-sessions -g` 列出所有 session（全局）
 - **延迟创建 session** —— 启动 REPL 时不立即创建 session，用户提交第一条消息后才创建，避免产生空白 session
 
 ### Out of Scope
@@ -32,6 +33,8 @@ type: project
 | 每轮自动保存 | 减少用户心智负担，防止意外丢失对话 |
 | Ctrl+D + 双 Ctrl+C | 区分"保存退出"与"强制退出"两种意图 |
 | 延迟创建 session | 避免产生大量空白 session，仅在用户实际输入后才创建 |
+| `-s` 和 `--session` 互通 | 提供长短两种参数形式，便于记忆和使用 |
+| `list-sessions` 按目录过滤 | 避免显示无关项目的 session，减少干扰；`-g` 查看全局 |
 
 ## Context
 
