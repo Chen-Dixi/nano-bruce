@@ -50,6 +50,19 @@ type: project
 3. **学习友好** —— 符合项目"透明优先"原则
 4. **Git 兼容** —— 可纳入版本控制，便于追踪变化
 
+### Terminal UI
+
+| 层级 | 技术 | 选择理由 |
+|------|------|----------|
+| TUI 框架 | OpenTUI | OpenCode 同款框架、React/Solid 绑定、组件丰富、终端兼容性好 |
+
+**选型理由：**
+
+1. **实战验证** —— OpenCode 已在生产环境使用，稳定可靠
+2. **组件丰富** —— 内置 Markdown 渲染、代码高亮、交互选择等组件
+3. **多范式支持** —— React 和 Solid 绑定，灵活选择
+4. **终端兼容** —— 良好的终端模拟器兼容性
+
 ### AI Provider 层
 
 | Provider | 状态 | 备注 |
@@ -123,6 +136,8 @@ type: project
 - 缺少类似 OpenCode 的 Rich Terminal UI
 - 缺少实时状态展示与进度反馈
 - 缺少交互式确认与选择界面
+
+**解决方案：** 使用 OpenTUI（OpenCode 同款 TUI 框架），提供 Markdown 渲染、代码高亮、交互组件等能力
 
 **参考：** OpenCode, Claude Code 的 TUI 交互体验
 

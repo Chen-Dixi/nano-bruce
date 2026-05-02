@@ -147,6 +147,7 @@ async function runSingleTurn(
 
   const agent = new Agent({
     model,
+    temperature: 1,
     skillRegistry: registry,
     promptBuilder: new PromptBuilder(registry),
     toolsEnabled: true,
@@ -245,6 +246,7 @@ async function runRepl(
     skillRegistry: registry,
     promptBuilder: new PromptBuilder(registry),
     toolsEnabled: true,
+    temperature: 1,
     cwd: process.cwd(),
     getApiKey: () => config.apiKey,
   });
