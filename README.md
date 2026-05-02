@@ -52,9 +52,9 @@
 
 ```bash
 cd bruce-ts
-npm install
-npm run build
-cd packages/app && npm link  # 全局安装 bruce 命令
+bun install
+bun run build
+cd packages/app && bun link  # 全局安装 bruce 命令
 ```
 
 ### 初始化配置
