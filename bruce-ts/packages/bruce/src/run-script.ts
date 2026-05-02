@@ -78,7 +78,7 @@ export function runSkillScript(
     command = "bash";
     execArgs = [scriptPath, ...safeArgs];
   } else {
-    command = "node";
+    command = "bun";
     execArgs = [scriptPath, ...safeArgs];
   }
 

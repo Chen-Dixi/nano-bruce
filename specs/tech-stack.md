@@ -13,9 +13,9 @@ type: project
 | 层级 | 技术 | 选择理由 |
 |------|------|----------|
 | 语言 | TypeScript | 类型安全、生态丰富、前后端通用 |
-| 运行时 | Node.js | 跨平台、CLI 友好、流式处理能力强 |
-| 包管理 | npm | 标准化、广泛支持 |
-| 存储 | SQLite | 轻量级、零配置、单文件部署、适合 CLI 工具 |
+| 运行时 | Bun | 高性能、原生支持 SQLite、OpenTUI 兼容、内置打包与测试 |
+| 包管理 | Bun | 快速安装、内置 lockfile、兼容 npm workspaces |
+| 存储 | SQLite (bun:sqlite) | 轻量级、零配置、Bun 原生支持、无需原生编译依赖 |
 
 ### SQLite 存储方案
 
@@ -28,11 +28,11 @@ type: project
 **选型理由：**
 
 1. **零配置** —— 无需独立数据库服务，数据即文件
-2. **跨平台** —— Node.js 原生支持（better-sqlite3 / sql.js）
+2. **原生支持** —— Bun 内置 `bun:sqlite`，无需第三方库和原生编译
 3. **适合 CLI** —— 单用户场景，无并发压力
 4. **便于迁移** —— 单 `.db` 文件，易于备份和迁移
 
-**推荐库：** `better-sqlite3`（高性能同步 API）或 `sql.js`（纯 JS 实现，无编译依赖）
+**使用方式：** `import { Database } from "bun:sqlite"`
 
 ### Markdown 记忆存储
 
@@ -204,6 +204,13 @@ type: project
 1. **学习目标** —— 自实现才能"吃透"底层机制
 2. **依赖控制** —— 避免大型框架的隐藏行为
 3. **灵活性** —— 不受框架设计决策限制
+
+### 为什么从 Node.js/npm 迁移到 Bun？
+
+1. **OpenTUI 依赖** —— OpenTUI 目前仅支持 Bun 运行时，是 Phase 3 Terminal UI 的必选框架
+2. **内置 SQLite** —— `bun:sqlite` 无需原生编译，替代 better-sqlite3，安装更快、依赖更少
+3. **性能提升** —— Bun 启动更快、包安装速度显著优于 npm
+4. **一体化工具链** —— 内置运行时、包管理、打包、测试，减少工具碎片化
 
 ### Provider 抽象层设计原则
 

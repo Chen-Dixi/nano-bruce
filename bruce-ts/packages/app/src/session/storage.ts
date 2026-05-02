@@ -1,10 +1,10 @@
 /**
  * Session SQLite 存储层
  *
- * 使用 better-sqlite3 实现持久化存储
+ * 使用 bun:sqlite 实现持久化存储
  */
 
-import Database from "better-sqlite3";
+import { Database } from "bun:sqlite";
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
@@ -22,16 +22,15 @@ export function getSessionsDbPath(): string {
 }
 
 export class SessionStorage {
-  private db: Database.Database;
+  private db: Database;
 
   constructor(dbPath?: string) {
-    const path = dbPath ?? getSessionsDbPath();
-    this.db = new Database(path);
+    const dbPath_ = dbPath ?? getSessionsDbPath();
+    this.db = new Database(dbPath_, { create: true });
     this.initTables();
   }
 
   private initTables(): void {
-    // 创建表（包含 cwd 列）
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         uuid TEXT PRIMARY KEY,
@@ -43,13 +42,11 @@ export class SessionStorage {
       )
     `);
 
-    // 迁移：旧表可能没有 cwd 列，检查并添加
-    const columns = this.db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
+    const columns = this.db.query("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
     if (!columns.some(col => col.name === "cwd")) {
       this.db.exec("ALTER TABLE sessions ADD COLUMN cwd TEXT");
     }
 
-    // 创建索引
     this.db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_cwd ON sessions(cwd)");
     this.db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at)");
   }
@@ -69,13 +66,13 @@ export class SessionStorage {
 
   /** 加载指定 session */
   loadSession(uuid: string): Session | null {
-    const row = this.db.prepare("SELECT * FROM sessions WHERE uuid = ?").get(uuid) as {
+    const row = this.db.query("SELECT * FROM sessions WHERE uuid = ?").get(uuid) as {
       uuid: string;
       messages_json: string;
       created_at: number;
       updated_at: number;
       metadata_json: string | null;
-    } | undefined;
+    } | null;
 
     if (!row) return null;
 
@@ -92,7 +89,7 @@ export class SessionStorage {
   saveSession(session: Session): void {
     session.updatedAt = Date.now();
     const cwd = session.metadata?.cwd ?? null;
-    this.db.prepare(`
+    this.db.query(`
       INSERT OR REPLACE INTO sessions (uuid, cwd, messages_json, created_at, updated_at, metadata_json)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(
@@ -109,8 +106,7 @@ export class SessionStorage {
   listSessions(filterByCwd?: string): SessionListItem[] {
     let rows;
     if (filterByCwd) {
-      // 使用 cwd 列精确查询（有索引，高效）
-      rows = this.db.prepare(`
+      rows = this.db.query(`
         SELECT uuid, created_at, updated_at, messages_json
         FROM sessions
         WHERE cwd = ?
@@ -122,7 +118,7 @@ export class SessionStorage {
         messages_json: string;
       }>;
     } else {
-      rows = this.db.prepare(`
+      rows = this.db.query(`
         SELECT uuid, created_at, updated_at, messages_json
         FROM sessions
         ORDER BY updated_at DESC
@@ -144,7 +140,7 @@ export class SessionStorage {
 
   /** 删除指定 session */
   deleteSession(uuid: string): void {
-    this.db.prepare("DELETE FROM sessions WHERE uuid = ?").run(uuid);
+    this.db.query("DELETE FROM sessions WHERE uuid = ?").run(uuid);
   }
 
   /** 关闭数据库连接 */

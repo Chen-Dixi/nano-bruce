@@ -5,20 +5,22 @@
   "description": "Bruce agent monorepo (TypeScript).",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "start": "node packages/app/dist/cli.js",
-    "clean": "npm run clean --workspaces",
-    "version:sync": "node scripts/sync-version.mjs"
+    "build": "bun scripts/build.mjs",
+    "start": "bun packages/app/dist/cli.js",
+    "clean": "bun run clean --workspaces",
+    "version:sync": "bun scripts/sync-version.mjs"
   },
   "workspaces": [
     "packages/*"
   ],
   "devDependencies": {
+    "@types/bun": "^1.3.13",
     "@types/node": "^22.10.0",
+    "bun-types": "^1.3.13",
     "typescript": "^5.7.2",
     "vitest": "^4.1.5"
   },
   "engines": {
-    "node": ">=18"
+    "bun": ">=1"
   }
 }
