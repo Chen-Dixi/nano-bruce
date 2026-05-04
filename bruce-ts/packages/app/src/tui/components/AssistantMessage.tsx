@@ -21,14 +21,14 @@ export function AssistantMessage(props: AssistantMessageProps) {
       paddingBottom={1}
       gap={1}
     >
+      {hasThinking() && (
+        <ThinkingBlock content={msg().thinking!} />
+      )}
       <box flexGrow={1}>
         <text fg="#cdd6f4" wrapMode="word">
           {msg().content}
         </text>
       </box>
-      {hasThinking() && (
-        <ThinkingBlock content={msg().thinking!} />
-      )}
       {hasToolCalls() && (
         <ToolCallBlock toolCalls={msg().toolCalls!} />
       )}
