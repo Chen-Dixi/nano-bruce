@@ -68,8 +68,8 @@ export class Agent {
     });
   }
 
-  subscribe(fn: (e: AgentEvent) => void) {
-    this.engine.subscribe(fn);
+  subscribe(fn: (e: AgentEvent) => void): () => void {
+    return this.engine.subscribe(fn);
   }
   
 

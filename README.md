@@ -54,7 +54,7 @@
 cd bruce-ts
 bun install
 bun run build
-cd packages/app && bun link  # 全局安装 bruce 命令
+cd packages/app && bun link  # 全局安装 bruce 命令（编译后的独立可执行文件）
 ```
 
 ### 初始化配置
@@ -73,7 +73,7 @@ export MOONSHOT_API_KEY=your_key
 ### CLI 使用
 
 ```bash
-# 进入 REPL 多轮对话（延迟创建 session，首次输入后创建）
+# 进入 TUI 界面（终端 UI 多轮对话）
 bruce
 
 # 单轮对话（不创建 session）
@@ -123,6 +123,7 @@ await agent.chat("帮我写一份周报");
 ## 特性
 
 - **极简引擎** —— 核心 Agent 循环自实现，无外部框架依赖
+- **Terminal UI** —— 基于 OpenTUI/Solid 的终端界面，支持快捷键交互
 - **技能系统** —— 通过 SKILL.md 定义技能，自动发现与加载
 - **流式输出** —— 支持打字机效果与增量推送
 - **多 Provider** —— 统一接口适配 OpenAI、Moonshot、DeepSeek、Anthropic 等
