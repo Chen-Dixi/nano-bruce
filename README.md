@@ -131,6 +131,10 @@ await agent.chat("帮我写一份周报");
 - **Session 管理** —— 多轮对话持久化，支持恢复历史会话
 - **配置系统** —— ~/.bruce/settings.json 统一管理 Provider 与偏好
 
+### TUI 界面效果
+
+![Bruce TUI Screenshot](specs/2026-05-03-terminal-ui/bruce_tui_screenshot.jpg)
+
 ---
 
 ## Acknowledgements
