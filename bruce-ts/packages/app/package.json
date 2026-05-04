@@ -3,23 +3,21 @@
   "version": "0.1.1",
   "description": "Bruce CLI app and re-exports.",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/bruce",
   "bin": {
-    "bruce": "dist/cli.js"
+    "bruce": "dist/bruce"
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "import": "./dist/bruce",
+      "default": "./dist/bruce"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && bun scripts/build.ts",
     "start": "bun dist/cli.js",
     "clean": "rm -rf dist",
     "test": "vitest run",
@@ -28,7 +26,9 @@
   "dependencies": {
     "@nano-bruce/agent-core": "0.1.1",
     "@nano-bruce/ai": "0.1.1",
-    "@nano-bruce/bruce": "0.1.1"
+    "@nano-bruce/bruce": "0.1.1",
+    "@opentui/solid": "^0.2.2",
+    "solid-js": "^1.9.12"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0",

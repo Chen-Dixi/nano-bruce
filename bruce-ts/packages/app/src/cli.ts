@@ -3,7 +3,7 @@
  * Bruce 命令行入口
  *
  * 运行模式：
- * - `bruce` → 进入 REPL 多轮对话
+ * - `bruce` → 启动 TUI 多轮对话
  * - `bruce -s <uuid>` 或 `bruce --session <uuid>` → 恢复指定 session
  * - `bruce --message "xxx"` → 单轮对话（不创建 session）
  * - `bruce init` → 初始化配置文件
@@ -11,8 +11,8 @@
  * - `bruce list-sessions -g` → 列出所有 session
  *
  * 退出方式：
- * - Ctrl+D → 保存 session 后优雅退出
- * - 双 Ctrl+C → 强制退出（不保存最后一轮）
+ * - Ctrl+C → 保存 session 后退出
+ * - Esc → 保存 session 后退出
  */
 
 // 抑制第三方依赖的 punycode deprecation warning（需在导入前设置）
@@ -32,8 +32,6 @@ _process.emit = function (event: string, warning: Error) {
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import readline from "node:readline/promises";
-import { stdin as input, stdout as output } from "node:process";
 import { Agent, SkillRegistry, PromptBuilder } from "@nano-bruce/bruce";
 import { createModel } from "@nano-bruce/ai";
 import {
@@ -44,6 +42,7 @@ import {
 } from "./config/index.js";
 import { SessionStorage } from "./session/storage.js";
 import type { Session } from "./session/types.js";
+import { launchTui } from "./tui/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -211,8 +210,8 @@ function listSessions(showAll: boolean): void {
   console.log(`Total: ${sessions.length} sessions`);
 }
 
-/** REPL 多轮对话模式 */
-async function runRepl(
+/** TUI 多轮对话模式 */
+async function runTui(
   sessionUuid: string | undefined,
   skillsDir: string
 ): Promise<void> {
@@ -230,10 +229,7 @@ async function runRepl(
     }
     session = loaded;
     sessionCreated = true;
-    console.log(`Resumed session: ${sessionUuid}`);
-    console.log(`Messages in history: ${session.messages.length}`);
   }
-  // 不立即创建新 session，等用户输入第一条消息后再创建
 
   const registry = new SkillRegistry(skillsDir);
   registry.load();
@@ -254,96 +250,37 @@ async function runRepl(
   // 恢复已有消息到 agent
   if (session && session.messages.length > 0) {
     agent.setMessageHistory(session.messages);
-    console.log(`Restored ${session.messages.length} messages from history`);
   }
 
-  agent.subscribe((event) => {
-    if (event.type !== "message_update") return;
-    const e = event.assistantMessageEvent;
-    if (e.type === "text_delta" || e.type === "thinking_delta") {
-      process.stdout.write(e.delta);
-    } else if (e.type === "text_end" || e.type === "thinking_end") {
-      process.stdout.write("\n");
-    }
-  });
-
-  // Ctrl+C 处理状态
-  let ctrlCCount = 0;
-  let ctrlCTimer: NodeJS.Timeout | null = null;
-
-  const rl = readline.createInterface({ input, output });
-
-  // 处理 Ctrl+C
-  rl.on("SIGINT", () => {
-    ctrlCCount++;
-    if (ctrlCTimer) clearTimeout(ctrlCTimer);
-
-    if (ctrlCCount === 1) {
-      console.log("\nPress Ctrl+C again to exit (unsaved), or Ctrl+D to save and exit");
-      ctrlCTimer = setTimeout(() => {
-        ctrlCCount = 0;
-      }, 2000);
-    } else if (ctrlCCount >= 2) {
-      console.log("\nExiting without saving...");
-      rl.close();
+  await launchTui({
+    agent,
+    initialMessages: session?.messages,
+    provider: config.provider,
+    model: config.model || model.id,
+    cwd: process.cwd(),
+    onExit: () => {
+      if (session && sessionCreated) {
+        session.messages = agent.getMessageHistory();
+        storage.saveSession(session);
+      }
       storage.close();
-      process.exit(0);
-    }
-  });
-
-  console.log("\nEnter your message (Ctrl+D to save and exit):");
-
-  try {
-    while (true) {
-      output.write("bruce> ");
-      const userInput = await rl.question("");
-
-      if (userInput.trim() === "") continue;
-
-      // 重置 Ctrl+C 计数
-      ctrlCCount = 0;
-      if (ctrlCTimer) clearTimeout(ctrlCTimer);
-
-      // 如果 session 还未创建，先创建（延迟创建，避免空白 session）
-      if (!session) {
+    },
+    onSessionSave: (messages) => {
+      if (session) {
+        session.messages = messages;
+        storage.saveSession(session);
+      } else {
+        // 首次输入后创建 session
         session = storage.createSession({
           cwd: process.cwd(),
           skillsDir,
         });
         sessionCreated = true;
-        console.log(`Created session: ${session.uuid}`);
-      }
-
-      // 调用 agent
-      try {
-        await agent.chat(userInput.trim());
-
-        // 获取完整对话历史并保存
-        session.messages = agent.getMessageHistory();
-
-        // 保存 session
+        session.messages = messages;
         storage.saveSession(session);
-        console.log();
-      } catch (err) {
-        console.error("Error:", err instanceof Error ? err.message : String(err));
       }
-    }
-  } catch (err) {
-    // Ctrl+D 会触发 AbortError
-    if (err instanceof Error && (err.name === "AbortError" || (err as any).code === "ABORT_ERR")) {
-      // 只有已创建 session 才保存
-      if (session && sessionCreated) {
-        console.log("\nSaving session and exiting...");
-        session.messages = agent.getMessageHistory();
-        storage.saveSession(session);
-      } else {
-        console.log("\nExiting (no session created)...");
-      }
-      storage.close();
-      process.exit(0);
-    }
-    throw err;
-  }
+    },
+  });
 }
 
 async function main() {
@@ -369,8 +306,8 @@ async function main() {
     return;
   }
 
-  // REPL 多轮对话模式
-  await runRepl(args.sessionUuid, skillsDir);
+  // TUI 多轮对话模式
+  await runTui(args.sessionUuid, skillsDir);
 }
 
 main().catch((err) => {

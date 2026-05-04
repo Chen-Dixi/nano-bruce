@@ -4,10 +4,8 @@
   "description": "LLM provider adapters (OpenAI-compatible API).",
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
@@ -16,7 +14,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && bun build ./src/index.ts --outdir ./dist --splitting --target bun",
     "clean": "rm -rf dist"
   },
   "dependencies": {

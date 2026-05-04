@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "bun scripts/build.mjs",
-    "start": "bun packages/app/dist/cli.js",
-    "clean": "bun run clean --workspaces",
+    "start": "bun packages/app/dist/bruce",
+    "clean": "bun scripts/clean.mjs",
     "version:sync": "bun scripts/sync-version.mjs"
   },
   "workspaces": [
@@ -22,5 +22,10 @@
   },
   "engines": {
     "bun": ">=1"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.2.2",
+    "@opentui/solid": "^0.2.2",
+    "solid-js": "^1.9.12"
   }
 }
