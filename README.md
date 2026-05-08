@@ -1,9 +1,21 @@
+
+
 # Bruce
 
-🥚 Infant Stage
+<p align="center">
+  <a>
+  <picture>
+    <img src="bruce-ts/packages/bruce/src/asset/bruce_logo.png" alt="OpenCode logo">
+  </picture>
+  <a/>
+</p>
+
+[![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=ffffff)](https://bun.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=ffffff)](https://www.typescriptlang.org)
 
 > A minimal LLM Agent harness with skill capabilities.
 
+![Bruce Terminal UI](bruce-ts/packages/app/src/asset/welcome_page.jpg)
 
 ---
 
