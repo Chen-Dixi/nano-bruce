@@ -30,15 +30,17 @@ function defaultConvertToLlm(messages: AgentMessage[], systemPrompt: string): Ch
       out.push({ role: "user", content });
     } else if (m.role === "assistant") {
       const textParts: string[] = [];
+      const thinkingParts: string[] = [];
       const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
       for (const b of m.content) {
         if (b.type === "text") textParts.push(b.text);
-        else if (b.type === "thinking") textParts.push(b.thinking);
+        else if (b.type === "thinking") thinkingParts.push(b.thinking);
         else if (b.type === "toolCall") toolCalls.push({ id: b.id, name: b.name, arguments: JSON.stringify(b.arguments) });
       }
       out.push({
         role: "assistant",
         content: textParts.length ? textParts.join("") : null,
+        ...(thinkingParts.length ? { reasoning_content: thinkingParts.join("") } : {}),
         tool_calls: toolCalls.length ? toolCalls : undefined,
       });
     } else if (m.role === "toolResult") {

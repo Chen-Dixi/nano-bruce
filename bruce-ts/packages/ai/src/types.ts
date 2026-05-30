@@ -13,6 +13,7 @@ export type ChatMessage =
   | {
       role: "assistant";
       content: string | null;
+      reasoning_content?: string;
       tool_calls?: Array<{ id: string; name: string; arguments: string }>;
     }
   | { role: "tool"; tool_call_id: string; content: string };

@@ -333,13 +333,18 @@ function toOpenAIMessage(m: ChatMessage): OpenAI.Chat.Completions.ChatCompletion
       return {
         role: "assistant",
         content: m.content ?? "",
+        ...(m.reasoning_content ? { reasoning_content: m.reasoning_content } : {}),
         tool_calls: m.tool_calls.map((tc) => ({
           id: tc.id,
           type: "function" as const,
           function: { name: tc.name, arguments: tc.arguments },
         })),
       };
-    return { role: "assistant", content: m.content ?? "" };
+    return {
+      role: "assistant",
+      content: m.content ?? "",
+      ...(m.reasoning_content ? { reasoning_content: m.reasoning_content } : {}),
+    };
   }
   return { role: "tool", tool_call_id: m.tool_call_id, content: m.content };
 }
